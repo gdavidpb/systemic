@@ -1,0 +1,9 @@
+# Reports produced by the skill itself
+systemic-out/
+
+# macOS
+.DS_Store
+
+# Python bytecode from the fixtures
+__pycache__/
+*.py[cod]

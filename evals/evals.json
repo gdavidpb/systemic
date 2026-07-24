@@ -1,0 +1,97 @@
+{
+  "skill_name": "systemic",
+  "notes": "Evals 1, 2 and 4 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1's fixtures to test report-language selection). Substitute the absolute path of the skill directory for <SKILL_DIR> when running them. Eval 3 is a template that needs a target repo supplied at run time — any codebase with a stateful lifecycle works; it must NOT hardcode a specific project. Runs write a report under systemic-out/; because the fixtures are a fixture directory and not the grader's own project, the skill should place it under the working directory rather than inside evals/fixtures/. Clean it between runs so a stale file is not mistaken for a fresh one.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "seeded-defects-code",
+      "prompt": "Run a systemic analysis of the orders module at <SKILL_DIR>/evals/fixtures/orders/ (README.md, models.py, operations.py, webhook.py). I want to find inconsistencies in its states and operations before it reaches production.",
+      "expected_output": "A report following the skill's exact structure that models the orders system (elements, operators, declared vs built machine) and detects the 9 seeded flaws with file:line evidence, honesty labels and severities, plus a missing-piece synthesis.",
+      "files": [
+        "evals/fixtures/orders/README.md",
+        "evals/fixtures/orders/models.py",
+        "evals/fixtures/orders/operations.py",
+        "evals/fixtures/orders/webhook.py"
+      ],
+      "assertions": [
+        "Detects the closure violation: refund() writes status 'refund_pending' which is not in the STATUS set (models.py vs operations.py)",
+        "Detects the illegal representable state: mark_paid() sets paid_at/status without any guard on current status (a draft order can become paid)",
+        "Detects the declared-vs-built contradiction: cancel() has no guard while the README forbids canceling a shipped order",
+        "Detects the ambiguous operator: apply_discount() switches semantics on value<=1 (fraction vs absolute) while the README says percentage 0-100",
+        "Detects the broken symmetry: hold() exists but no release/resume operation exists anywhere in the module",
+        "Detects the unreachable state: in_review is declared (README + STATUS) but no operation ever produces it",
+        "Detects the idempotency flaw: handle_payment_webhook() has no dedup by event_id although the README warns the provider retries/duplicates",
+        "Detects the double source of truth: Order.total stored while calc_total() exists, and add_item() does not update total",
+        "Detects the partial-failure risk in ship(): inventory reserved, courier.notify may raise, status not yet written, no transaction/compensation",
+        "Report includes a mermaid state diagram",
+        "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY)",
+        "Every finding carries a severity (critical/high/medium/low)",
+        "Findings cite file:line (or file+function) evidence",
+        "Report includes a missing-piece/root-cause synthesis (e.g. a single guarded transition operator would prevent several findings at once)",
+        "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
+        "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "design-doc-only",
+      "prompt": "Here is a design document for an equipment rental feature: <SKILL_DIR>/evals/fixtures/rental-doc/DESIGN.md. Without looking at any code, is the described design systemically consistent? What ambiguities or holes does the document have?",
+      "expected_output": "A document-only systemic analysis: models the rental lifecycle as a conceptual machine (mermaid), and surfaces the seeded contradictions, ambiguities and holes citing only sections/lines of the document, with honesty labels and severities.",
+      "files": [
+        "evals/fixtures/rental-doc/DESIGN.md"
+      ],
+      "assertions": [
+        "Models the rental lifecycle as a conceptual state machine derived from the document",
+        "Detects the declared-vs-declared contradiction: 'overdue rentals can never be extended' vs the extend() example of a customer two days late extending",
+        "Detects the idempotency/double-refund risk: locker return events may fire multiple times while each return event triggers the deposit refund",
+        "Detects that 'suspended' (business rule 3) is used but absent from the declared state list — an unrepresentable state",
+        "Detects the double source of truth: invoice total stored at approval time vs price defined as daily_rate × days actually rented (extension/late return drift)",
+        "Flags the deposit-refund condition as AMBIGUITY: 'good condition' undefined (who decides, when, no timeline)",
+        "Detects the hole for lost items: handled 'outside the system' with no transition, leaving the rental machine stuck in active/overdue",
+        "Evidence cites only sections/lines of the document (no code paths)",
+        "Report includes a mermaid state diagram",
+        "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY)",
+        "Every finding carries a severity (critical/high/medium/low)",
+        "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
+        "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "real-repo-lifecycle",
+      "prompt": "Run a systemic analysis of the <LIFECYCLE> state machine in <TARGET_REPO_PATHS>. Is the lifecycle consistent?",
+      "expected_output": "Models the target lifecycle from the real code: its actual states (no invented ones), operators mapped to transitions, mermaid diagram of the built machine, findings with file:line evidence, honesty labels and severities, and a limits/not-verified section.",
+      "files": [],
+      "assertions": [
+        "Identifies the real states of the target lifecycle from the code and does not invent states that do not exist",
+        "Maps the key operators to transitions (which operation executes each transition)",
+        "Report includes a mermaid state diagram of the built machine",
+        "Report includes an explicit system model (elements and operators listed, not just prose)",
+        "Findings cite file:line evidence",
+        "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY) and a severity",
+        "Report includes a limits/not-verified section stating which checks did not apply",
+        "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
+        "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "explicit-report-language",
+      "prompt": "Haz un análisis sistémico del módulo de órdenes en <SKILL_DIR>/evals/fixtures/orders/, pero escribe el reporte en inglés.",
+      "expected_output": "The same systemic report as eval 1, written entirely in English because the user asked for it explicitly, even though the request itself is in Spanish — with the honesty labels and severities left as fixed keywords.",
+      "files": [
+        "evals/fixtures/orders/README.md",
+        "evals/fixtures/orders/models.py",
+        "evals/fixtures/orders/operations.py",
+        "evals/fixtures/orders/webhook.py"
+      ],
+      "assertions": [
+        "The report's section headers and prose are in English, following the explicit request rather than the language of the prompt",
+        "Honesty labels stay as the fixed keywords INCONSISTENCY/RISK/AMBIGUITY (not translated)",
+        "Severities stay as the fixed keywords critical/high/medium/low (not translated)",
+        "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
+        "Detects at least the closure violation and the missing-guard findings from eval 1 (language choice does not degrade the analysis)"
+      ]
+    }
+  ]
+}

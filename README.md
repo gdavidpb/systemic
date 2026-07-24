@@ -54,7 +54,7 @@ assignment. `systemic` sees a closure violation and says so.
 The folder name must match the skill name, so clone it as `systemic`:
 
 ```bash
-git clone https://github.com/<you>/systemic ~/.claude/skills/systemic
+git clone https://github.com/gdavidpb/systemic ~/.claude/skills/systemic
 ```
 
 That's it — Claude Code picks it up from `~/.claude/skills/`. For a

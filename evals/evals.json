@@ -1,6 +1,6 @@
 {
   "skill_name": "systemic",
-  "notes": "Evals 1, 2 and 4 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1's fixtures to test report-language selection). Substitute the absolute path of the skill directory for <SKILL_DIR> when running them. Eval 3 is a template that needs a target repo supplied at run time — any codebase with a stateful lifecycle works; it must NOT hardcode a specific project. Runs write a report under systemic-out/; because the fixtures are a fixture directory and not the grader's own project, the skill should place it under the working directory rather than inside evals/fixtures/. Clean it between runs so a stale file is not mistaken for a fresh one.",
+  "notes": "Evals 1, 2, 4 and 5 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1's fixtures to test report-language selection; 5 targets checks 6 and 12, which the other fixtures barely exercise). Substitute the absolute path of the skill directory for <SKILL_DIR> when running them. Eval 3 is a template that needs a target repo supplied at run time — any codebase with a stateful lifecycle works; it must NOT hardcode a specific project. Runs write a report under systemic-out/; because the fixtures are a fixture directory and not the grader's own project, the skill should place it under the working directory rather than inside evals/fixtures/. Clean it between runs so a stale file is not mistaken for a fresh one.",
   "evals": [
     {
       "id": 1,
@@ -91,6 +91,36 @@
         "Severities stay as the fixed keywords critical/high/medium/low (not translated)",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
         "Detects at least the closure violation and the missing-guard findings from eval 1 (language choice does not degrade the analysis)"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "saga-compensations-and-loops",
+      "prompt": "Run a systemic analysis of the booking saga at <SKILL_DIR>/evals/fixtures/booking-saga/ (README.md, steps.py, saga.py, worker.py). It runs across three external providers with no shared transaction and I am worried about what happens when a step fails.",
+      "expected_output": "A report that models the saga as a system, maps each step to its compensation, and concentrates on partial failure (check 6) and feedback loops (check 12) — the two checks the other fixtures barely exercise — with file:line evidence, honesty labels and severities.",
+      "files": [
+        "evals/fixtures/booking-saga/README.md",
+        "evals/fixtures/booking-saga/steps.py",
+        "evals/fixtures/booking-saga/saga.py",
+        "evals/fixtures/booking-saga/worker.py"
+      ],
+      "assertions": [
+        "Detects the compensation off-by-one: _compensate_from() slices STEPS[:i-1] instead of STEPS[:i], so the step immediately before the failure is never compensated (saga.py, _compensate_from)",
+        "Traces the off-by-one to money: when reserve_hotel fails, charge_card is never compensated, so the customer stays charged for a trip that was not booked — contradicting the guarantee and rule 3",
+        "Detects that a failure in the FIRST step makes STEPS[:i-1] evaluate to STEPS[:-1], compensating two steps that never ran (releasing a null flight_ref and refunding a null charge_ref)",
+        "Detects that the compensation loop has no error handling: a compensation that raises skips every remaining compensation and leaves no record (saga.py, _compensate_from)",
+        "Detects that no saga state is ever persisted: booking.completed lives in memory and is never written, so a crash between steps leaves the invariant with no maintainer",
+        "Detects that booking.completed is appended to but never read by the compensation logic — a tracked source of truth the recovery path ignores",
+        "Detects the retry amplification in handle(): an unbounded while True with no backoff that ALSO re-enqueues the same booking on every failure, so each failure multiplies the work (worker.py, handle)",
+        "Detects the alert feedback loop: every failure notifies on-call, and on_alert() re-enqueues the booking, so the alert causes the action that causes the alert (worker.py, handle + on_alert)",
+        "Detects the dead-letter loop: drain_dead_letter() re-enqueues everything with no filter and nothing verifies the underlying problem was fixed, contrary to rule 6 (worker.py, drain_dead_letter)",
+        "Detects that nothing ever writes to the dead-letter queue although rule 6 declares it: drain_dead_letter() drains a queue no operator fills",
+        "Detects the timeout/retry mismatch: TIMEOUT_SECONDS = 2 while rule 4 declares the providers slow, so timeouts are the expected case and feed the retry loop",
+        "Names check 6 (invariants and partial failure) and check 12 (feedback loops) explicitly as the checks that carry the analysis",
+        "Report includes a mermaid diagram of the saga and its compensation paths",
+        "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY) and a severity",
+        "Findings cite file:line evidence",
+        "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path"
       ]
     }
   ]

@@ -1,5 +1,7 @@
 # systemic
 
+*[Léelo en español](README.es.md)*
+
 **A Claude Code skill that audits software the way General Systems Theory
 audits a system — and reports the properties it violates, not the lines it
 got wrong.**
@@ -192,14 +194,15 @@ references/
   gst-framework.md            the conceptual vocabulary, loaded before phase 1
   checks.md                   how to detect each of the 12, loaded in phase 2
 evals/
-  evals.json                  4 evals with assertions
+  evals.json                  5 evals with assertions
   fixtures/orders/            a code module with 9 seeded defects
   fixtures/rental-doc/        a design document with 7 seeded flaws
+  fixtures/booking-saga/      a compensating saga: partial failure and loops
 ```
 
 ## Evals
 
-`evals/evals.json` holds four cases with explicit assertions:
+`evals/evals.json` holds five cases with explicit assertions:
 
 1. **seeded-defects-code** — 9 planted flaws in a Python module, self-contained.
 2. **design-doc-only** — a design document with no code; verifies the skill
@@ -207,6 +210,8 @@ evals/
 3. **real-repo-lifecycle** — a template; supply your own repo and lifecycle.
 4. **explicit-report-language** — a Spanish prompt requesting an English
    report; verifies the explicit request wins and the labels stay untranslated.
+5. **saga-compensations-and-loops** — a saga with compensations; exercises
+   checks 6 and 12, which the other fixtures barely touch.
 
 Substitute the skill's absolute path for `<SKILL_DIR>` when running them.
 

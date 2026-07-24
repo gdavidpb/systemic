@@ -194,15 +194,16 @@ references/
   gst-framework.md            the conceptual vocabulary, loaded before phase 1
   checks.md                   how to detect each of the 12, loaded in phase 2
 evals/
-  evals.json                  5 evals with assertions
+  evals.json                  6 evals with assertions
   fixtures/orders/            a code module with 9 seeded defects
   fixtures/rental-doc/        a design document with 7 seeded flaws
   fixtures/booking-saga/      a compensating saga: partial failure and loops
+  fixtures/clean-ticket/      a correct lifecycle: the false-positive control
 ```
 
 ## Evals
 
-`evals/evals.json` holds five cases with explicit assertions:
+`evals/evals.json` holds six cases with explicit assertions:
 
 1. **seeded-defects-code** — 9 planted flaws in a Python module, self-contained.
 2. **design-doc-only** — a design document with no code; verifies the skill
@@ -212,8 +213,15 @@ evals/
    report; verifies the explicit request wins and the labels stay untranslated.
 5. **saga-compensations-and-loops** — a saga with compensations; exercises
    checks 6 and 12, which the other fixtures barely touch.
+6. **clean-code-no-false-positives** — a deliberately correct module. Every
+   other fixture rewards finding things; this one is graded on what the skill
+   does **not** report. A run that "finds more" here is a worse run.
 
 Substitute the skill's absolute path for `<SKILL_DIR>` when running them.
+
+Eval 6 is the one that matters most as the skill changes. A tool that reports
+problems is only as useful as its false-positive rate, and every other eval
+pushes in the direction of reporting more.
 
 ## Contributing
 

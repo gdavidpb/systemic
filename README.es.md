@@ -202,15 +202,16 @@ references/
   gst-framework.md            el vocabulario conceptual, se lee antes de la fase 1
   checks.md                   cómo detectar cada uno de los 12, se lee en la fase 2
 evals/
-  evals.json                  5 evals con aserciones
+  evals.json                  6 evals con aserciones
   fixtures/orders/            módulo de código con 9 defectos sembrados
   fixtures/rental-doc/        documento de diseño con 7 defectos sembrados
   fixtures/booking-saga/      saga con compensaciones: fallo parcial y bucles
+  fixtures/clean-ticket/      ciclo de vida correcto: control de falsos positivos
 ```
 
 ## Evals
 
-`evals/evals.json` tiene cinco casos con aserciones explícitas:
+`evals/evals.json` tiene seis casos con aserciones explícitas:
 
 1. **seeded-defects-code** — 9 defectos sembrados en un módulo Python.
 2. **design-doc-only** — un documento de diseño sin código; verifica que la
@@ -221,8 +222,16 @@ evals/
    traduzcan.
 5. **saga-compensations-and-loops** — una saga con compensaciones; ejercita
    los checks 6 y 12, que las otras fixtures apenas tocan.
+6. **clean-code-no-false-positives** — un módulo deliberadamente correcto.
+   Todas las demás fixtures premian encontrar cosas; ésta se califica por lo
+   que la skill **no** reporta. Una corrida que «encuentra más» aquí es una
+   corrida peor.
 
 Sustituye `<SKILL_DIR>` por la ruta absoluta de la skill al correrlas.
+
+La eval 6 es la que más importa a medida que la skill cambia. Una herramienta
+que reporta problemas vale lo que valga su tasa de falsos positivos, y todas
+las demás evals empujan hacia reportar más.
 
 ## Contribuir
 

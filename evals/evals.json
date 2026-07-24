@@ -1,6 +1,6 @@
 {
   "skill_name": "systemic",
-  "notes": "Evals 1, 2, 4 and 5 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1's fixtures to test report-language selection; 5 targets checks 6 and 12, which the other fixtures barely exercise). Substitute the absolute path of the skill directory for <SKILL_DIR> when running them. Eval 3 is a template that needs a target repo supplied at run time — any codebase with a stateful lifecycle works; it must NOT hardcode a specific project. Runs write a report under systemic-out/; because the fixtures are a fixture directory and not the grader's own project, the skill should place it under the working directory rather than inside evals/fixtures/. Clean it between runs so a stale file is not mistaken for a fresh one.",
+  "notes": "Evals 1, 2, 4, 5 and 6 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1's fixtures to test report-language selection; 5 targets checks 6 and 12, which the other fixtures barely exercise; 6 is the false-positive control — its fixture has no seeded defects and it is graded mainly on what the skill does NOT report, so a run that 'finds more' is a worse run). Substitute the absolute path of the skill directory for <SKILL_DIR> when running them. Eval 3 is a template that needs a target repo supplied at run time — any codebase with a stateful lifecycle works; it must NOT hardcode a specific project. Runs write a report under systemic-out/; because the fixtures are a fixture directory and not the grader's own project, the skill should place it under the working directory rather than inside evals/fixtures/. Clean it between runs so a stale file is not mistaken for a fresh one.",
   "evals": [
     {
       "id": 1,
@@ -71,7 +71,8 @@
         "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY) and a severity",
         "Report includes a limits/not-verified section stating which checks did not apply",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
-        "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report"
+        "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report",
+        "CONDITIONAL — only if the target repo has graphify-out/graph.json: the report states that the graph was used to choose which modules to open, and findings still cite sources read directly. If the target has no graphify-out/, the report must not mention it at all"
       ]
     },
     {
@@ -121,6 +122,32 @@
         "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY) and a severity",
         "Findings cite file:line evidence",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "clean-code-no-false-positives",
+      "prompt": "Run a systemic analysis of the ticket module at <SKILL_DIR>/evals/fixtures/clean-ticket/ (README.md, models.py, operations.py). Is this lifecycle consistent?",
+      "expected_output": "A report on a deliberately correct module: it must confirm the lifecycle is consistent, say concretely WHY it is, and resist manufacturing findings. This is the only eval whose primary signal is what the skill does NOT report — every other fixture rewards finding things, so this one measures the false-positive rate that determines whether the tool can be trusted.",
+      "files": [
+        "evals/fixtures/clean-ticket/README.md",
+        "evals/fixtures/clean-ticket/models.py",
+        "evals/fixtures/clean-ticket/operations.py"
+      ],
+      "assertions": [
+        "PRIMARY: reports ZERO critical and ZERO high findings",
+        "States explicitly what is correct rather than only listing problems: apply_transition is the single writer of status, TRANSITIONS is the declared source of truth, and every non-terminal state has an exit",
+        "Confirms closure: apply_transition can only write values present in TRANSITIONS, all of which are in STATUS",
+        "Confirms idempotency by construction: a repeated operation returns False and changes nothing, because the (status, action) pair is no longer in the table",
+        "Does NOT report close() having no inverse as a symmetry violation — closed is a declared terminal state (FINAL_STATUSES, rule 4), and a declared terminal is not a broken duality",
+        "Does NOT report the declared limits (no direct reassignment, no spam/duplicate state, no priority or SLA) as defects; they belong in the Limits section, correctly identified as deliberate and documented",
+        "Does NOT inflate the two in-memory statements in assign()/resolve() into a partial-failure or atomicity RISK — there is no I/O, no persistence and no multi-system write; a low-severity note is acceptable, a high or critical is a false positive",
+        "Does NOT invent concurrency findings: Ticket is an in-memory dataclass with no persistence layer, so check 8 must be reported as not verifiable rather than as a lost update",
+        "Does NOT invent states, transitions or operators that are absent from TRANSITIONS and operations.py",
+        "MAY legitimately observe that FINAL_STATUSES duplicates a fact derivable from TRANSITIONS (closed is the state with no outgoing transitions) — if reported, it must be rated low, and it is the only finding above informational that the material supports",
+        "Names which checks did not apply and why (at minimum 6, 8 and 12) instead of forcing all twelve",
+        "Report still follows the full structure: systems table, mermaid state diagram, limits section",
+        "Every finding, if any, carries an honesty label and a severity"
       ]
     }
   ]

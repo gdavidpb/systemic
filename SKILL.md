@@ -42,9 +42,14 @@ artifact, never HTML, never served from a localhost port. See Phase 3.
 The user may provide: a path (repo, module, files), a design document, or a
 description. If the scope is a large repo with no focus, propose narrowing to
 the subsystem with the most state (state machines, lifecycles) — that is where
-systemic analysis pays off. If `graphify-out/graph.json` exists in the
-project, use it as a map to locate modules and relations before reading code;
-it never replaces reading the sources.
+systemic analysis pays off.
+
+If `graphify-out/graph.json` exists in the project, read it BEFORE grepping
+and use it to choose which modules to open: it maps files and their relations,
+which beats searching a large repo blind. It never replaces reading the
+sources — every finding still cites code you read yourself. State in the
+report that you used it, so the reader knows how the scope was chosen. If it
+does not exist, say nothing about it and locate the modules by search.
 
 **Honesty rule (non-negotiable):** no finding without evidence you actually
 read. Before asserting an inconsistency, read the cited code or document and
@@ -163,6 +168,14 @@ transitions) and, when it has ≤8 states, the state × operator matrix.>
 - **Evidence**: `file:line` (or document section) + a short quote
 - **Systemic diagnosis**: <in GST vocabulary: which property is violated and why it matters>
 - **Recommendation**: <concrete action>
+
+<Then, when you seriously considered a candidate finding and rejected it, and
+a reader might reasonably expect it reported — a declared terminal state that
+"has no inverse", an absent feature that is a documented limit, a
+two-statement in-memory sequence that is not a partial failure — list them in
+a compact table: candidate + why it is not a finding. Naming what you refused
+to report is what separates an audit from a fishing expedition. Omit the table
+when nothing was seriously considered and rejected.>
 
 ## Missing pieces
 <Architectural recommendations: components the system needs — where the team

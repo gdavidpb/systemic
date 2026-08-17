@@ -123,8 +123,9 @@ never a page served from localhost.
   evidence, the systemic diagnosis, and a concrete recommendation.
 - **Missing pieces** — the components the system needs; where the team is
   carving the requirement out of the board instead of making pieces first.
-- **Limits and not-verified** — what the system cannot represent, and which
-  checks could not be run with the available material.
+- **Limits and not-verified** — a 12-row coverage table giving every check a
+  verdict — findings, clean, or not verifiable and why — plus what the system
+  cannot represent. A skipped check is visible, never silent.
 
 ### Every finding is labeled for honesty
 
@@ -140,6 +141,18 @@ finding actually causes.
 **The honesty rule is non-negotiable**: no finding without evidence actually
 read. Every claim cites `file:line` or a document section. If it cannot be
 evidenced, it is not reported.
+
+### Findings are audited before they are reported
+
+Every draft finding passes three gates. Its evidence is **re-read** at the
+cited location. A **refutation** is actively attempted — is the guard in a
+caller? the dedup in a middleware? the ambiguity resolved two sections later?
+Candidates that die are listed as rejected, with the evidence that killed
+them. And findings are **deduplicated by root cause**: one finding per
+defect, however many checks it trips and however many call sites repeat it.
+
+Run it twice and the second report is a re-audit: every finding classified
+**new**, **persisting** or **resolved** against the previous run.
 
 ## A real example
 
@@ -194,16 +207,18 @@ references/
   gst-framework.md            the conceptual vocabulary, loaded before phase 1
   checks.md                   how to detect each of the 12, loaded in phase 2
 evals/
-  evals.json                  6 evals with assertions
+  evals.json                  8 evals with assertions
   fixtures/orders/            a code module with 9 seeded defects
   fixtures/rental-doc/        a design document with 7 seeded flaws
   fixtures/booking-saga/      a compensating saga: partial failure and loops
   fixtures/clean-ticket/      a correct lifecycle: the false-positive control
+  fixtures/guarded-elsewhere/ four defended traps beside one real defect
+  fixtures/rerun/             a previous report: seeds the re-audit eval
 ```
 
 ## Evals
 
-`evals/evals.json` holds six cases with explicit assertions:
+`evals/evals.json` holds eight cases with explicit assertions:
 
 1. **seeded-defects-code** — 9 planted flaws in a Python module, self-contained.
 2. **design-doc-only** — a design document with no code; verifies the skill
@@ -216,12 +231,21 @@ evals/
 6. **clean-code-no-false-positives** — a deliberately correct module. Every
    other fixture rewards finding things; this one is graded on what the skill
    does **not** report. A run that "finds more" here is a worse run.
+7. **guarded-elsewhere-refutation** — four apparent defects, each defended in
+   another layer (a decorator, a middleware, a guarding caller, a
+   synchronized total), beside one real defect. Graded on rejecting the traps
+   while still catching the real one.
+8. **re-audit-diff** — a second run over the orders module with a previous
+   report in place; verifies findings come out classified new / persisting /
+   resolved.
 
 Substitute the skill's absolute path for `<SKILL_DIR>` when running them.
 
-Eval 6 is the one that matters most as the skill changes. A tool that reports
-problems is only as useful as its false-positive rate, and every other eval
-pushes in the direction of reporting more.
+Evals 6 and 7 are the ones that matter most as the skill changes. A tool that
+reports problems is only as useful as its false-positive rate, and every other
+eval pushes in the direction of reporting more. Eval 6 measures restraint —
+finding nothing where nothing is wrong; eval 7 measures discrimination —
+rejecting four defended traps without going blind to the defect beside them.
 
 ## Contributing
 

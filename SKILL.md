@@ -35,7 +35,7 @@ labels (INCONSISTENCY / RISK / AMBIGUITY) and the severities (critical / high
 comparable and greppable across projects.
 
 **Delivery**: the report is a Markdown file on the user's disk. Never an
-artifact, never HTML, never served from a localhost port. See Phase 3.
+artifact, never HTML, never served from a localhost port. See Phase 4.
 
 ## Input and scope
 
@@ -117,15 +117,75 @@ the "how to detect" for each). Summary of the 12:
     other and amplifying (retry storms, compensation loops).
 
 Do not force all 12 onto every scope: apply the ones the material lets you
-verify honestly, and state which did not apply and why.
+verify honestly. Every check still gets a row in the report's coverage table
+(Phase 4) — **findings**, **clean**, or **not verifiable** with the reason —
+so a skipped check is visible, never silent.
 
-## Phase 3 — Report
+## Phase 3 — Audit the findings (double check)
+
+Do not write the report from the Phase 2 draft. Audit it first — the report
+is itself a system, and this phase is its consistency check. Three gates, in
+order, on every draft finding:
+
+1. **Evidence re-check.** Re-open every cited `file:line` (or document
+   section) and read it again, now, against the claim. The quote must exist
+   at that location and must support the finding as written — not as you
+   remember it from modeling. A stale reference, a paraphrase presented as a
+   quote, or evidence that supports a weaker claim than the finding makes:
+   fix the finding or drop it.
+2. **Refutation attempt.** Before a finding is final, search for what would
+   invalidate it: a guard living in a caller, decorator or middleware; a
+   schema constraint; dedup at another layer; a document section that
+   resolves the ambiguity; a declared terminal state or documented limit.
+   Search — do not rely on recall. A finding that survives goes in the
+   report; one that dies goes to the rejected-candidates table with the
+   evidence that killed it.
+3. **Dedup.** One finding per root cause. The dedup key is the underlying
+   defect — what a single fix would repair — not the check that surfaced it:
+   a missing guard can appear as a completeness hole (3), an illegal
+   representable state (5) and a declared-vs-built divergence at once.
+   Report it ONCE under the check that explains it best and name the other
+   manifestations inside that finding. Two findings that share the same
+   recommendation are one finding; the same defect at N call sites is one
+   finding listing the sites, not N findings.
+
+Gates 1 and 2 fight confirmation bias, and the author of a finding is the
+worst-placed auditor of it. When the scope is large (a multi-module repo, or
+more than ~10 draft findings) and the environment can spawn subagents,
+delegate those two gates to one: give it ONLY the draft findings and the
+paths — not the Phase 1–2 reasoning that produced them — and have it verify
+each citation and attempt each refutation against the sources independently.
+Without subagents, run the gates yourself strictly against re-read sources,
+never against memory.
+
+After the gates, re-rate each surviving severity against the rubric (the
+damage it causes, not the check's typical ceiling), and check the report
+against itself: the executive summary's counts match the findings section,
+and the diagrams show the same states and transitions the text claims.
+
+## Phase 4 — Report
 
 **Where it goes**: write the report to `systemic-out/<scope-slug>.md` inside
 the analyzed project (create the directory if needed; the slug is the scope in
 kebab-case — `orders-module.md`, `rental-lifecycle.md`). If the user names a
-path, use theirs. If the file already exists, read it before writing and tell
-the user whether you replaced it or wrote a new one alongside.
+path, use theirs.
+
+**Re-audit**: before writing, look inside `systemic-out/` if it exists. If a
+previous report covers the same scope — the same slug, or a title naming the
+same scope — this run is a re-audit, not a first audit. Read it and classify
+every finding, then replace the file:
+
+- **persisting** — the old root cause is still evidenced. Re-verify it in
+  Phase 3 like any other finding (never copy it on faith) and mark it
+  *persisting* in the findings.
+- **resolved** — the old evidence no longer holds. List these in a short
+  "Resolved since last report" table with the evidence that resolves each.
+- **new** — findings of this run absent from the previous report; mark them
+  *new*.
+
+The executive summary states the three counts (new / persisting / resolved).
+If the existing file is not a systemic report of this scope (a name
+collision), keep it, write alongside, and say so in chat.
 
 Do not write into a target that is not the user's own working project — a
 read-only path, a vendored dependency, `node_modules`, a fixture directory, or
@@ -183,8 +243,14 @@ is "cutting the wood" instead of making pieces. Only if the analysis revealed
 them.>
 
 ## Limits and not-verified
-<Declared vs implicit limits of the system, and which checks did not apply or
-could not be verified with the available material.>
+<First the check-coverage table — all 12 rows, none skipped:
+
+| # | Check | Verdict | Evidence / why |
+
+Verdict is one of: **findings** (name them), **clean** (verified and nothing
+found — say what you looked at), **not verifiable** (say what material is
+missing). "Clean" and "not verifiable" are different claims; never blur them.
+Then the declared vs implicit limits of the system.>
 ```
 
 ### Honesty labels (mandatory on every finding)

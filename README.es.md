@@ -126,8 +126,10 @@ artifact, nunca una página servida desde localhost.
   salió, la evidencia, el diagnóstico sistémico y una recomendación concreta.
 - **Piezas faltantes** — los componentes que el sistema necesita; dónde el
   equipo está tallando el requisito en el tablero en vez de fabricar piezas.
-- **Límites y no verificado** — qué no puede representar el sistema, y qué
-  checks no pudieron correrse con el material disponible.
+- **Límites y no verificado** — una tabla de cobertura de 12 filas que da
+  veredicto a cada check —hallazgos, limpio, o no verificable y por qué—, más
+  lo que el sistema no puede representar. Un check saltado queda visible,
+  nunca silencioso.
 
 ### Cada hallazgo lleva una etiqueta de honestidad
 
@@ -147,6 +149,20 @@ entre proyectos e idiomas.
 **La regla de honestidad no es negociable**: ningún hallazgo sin evidencia
 efectivamente leída. Toda afirmación cita `archivo:línea` o una sección del
 documento. Lo que no se puede evidenciar, no se reporta.
+
+### Los hallazgos se auditan antes de reportarse
+
+Todo hallazgo borrador pasa tres compuertas. Su evidencia se **relee** en la
+ubicación citada. Se intenta activamente una **refutación** — ¿la guarda está
+en el caller? ¿el dedup en un middleware? ¿la ambigüedad se resuelve dos
+secciones después? Los candidatos que mueren quedan listados como rechazados,
+con la evidencia que los mató. Y los hallazgos se **deduplican por causa
+raíz**: un hallazgo por defecto, sin importar cuántos checks dispare ni en
+cuántos call sites se repita.
+
+Córrela dos veces y el segundo reporte es una re-auditoría: cada hallazgo
+clasificado como **nuevo**, **persistente** o **resuelto** contra la corrida
+anterior.
 
 ## Un ejemplo real
 
@@ -202,16 +218,18 @@ references/
   gst-framework.md            el vocabulario conceptual, se lee antes de la fase 1
   checks.md                   cómo detectar cada uno de los 12, se lee en la fase 2
 evals/
-  evals.json                  6 evals con aserciones
+  evals.json                  8 evals con aserciones
   fixtures/orders/            módulo de código con 9 defectos sembrados
   fixtures/rental-doc/        documento de diseño con 7 defectos sembrados
   fixtures/booking-saga/      saga con compensaciones: fallo parcial y bucles
   fixtures/clean-ticket/      ciclo de vida correcto: control de falsos positivos
+  fixtures/guarded-elsewhere/ cuatro trampas defendidas junto a un defecto real
+  fixtures/rerun/             un reporte previo: siembra la eval de re-auditoría
 ```
 
 ## Evals
 
-`evals/evals.json` tiene seis casos con aserciones explícitas:
+`evals/evals.json` tiene ocho casos con aserciones explícitas:
 
 1. **seeded-defects-code** — 9 defectos sembrados en un módulo Python.
 2. **design-doc-only** — un documento de diseño sin código; verifica que la
@@ -226,12 +244,21 @@ evals/
    Todas las demás fixtures premian encontrar cosas; ésta se califica por lo
    que la skill **no** reporta. Una corrida que «encuentra más» aquí es una
    corrida peor.
+7. **guarded-elsewhere-refutation** — cuatro defectos aparentes, cada uno
+   defendido en otra capa (un decorator, un middleware, un caller que guarda,
+   un total sincronizado), junto a un defecto real. Se califica por rechazar
+   las trampas sin dejar de atrapar el real.
+8. **re-audit-diff** — una segunda corrida sobre el módulo de pedidos con un
+   reporte previo presente; verifica que los hallazgos salgan clasificados
+   como nuevo / persistente / resuelto.
 
 Sustituye `<SKILL_DIR>` por la ruta absoluta de la skill al correrlas.
 
-La eval 6 es la que más importa a medida que la skill cambia. Una herramienta
-que reporta problemas vale lo que valga su tasa de falsos positivos, y todas
-las demás evals empujan hacia reportar más.
+Las evals 6 y 7 son las que más importan a medida que la skill cambia. Una
+herramienta que reporta problemas vale lo que valga su tasa de falsos
+positivos, y todas las demás evals empujan hacia reportar más. La 6 mide
+contención — no encontrar nada donde no hay nada; la 7 mide discriminación —
+rechazar cuatro trampas defendidas sin quedar ciega al defecto de al lado.
 
 ## Contribuir
 

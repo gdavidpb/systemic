@@ -3,8 +3,8 @@
 *[Read this in English](README.md)*
 
 **Una skill de Claude Code que audita software como audita un sistema la
-Teoría General de Sistemas — y reporta las propiedades que viola, no las
-líneas que escribió mal.**
+Teoría General de Sistemas — con hallazgos funcionales por defecto y un
+reporte sistémico detallado cuando lo pides.**
 
 La mayoría de los errores graves no son typos. Son violaciones de propiedades
 sistémicas: una operación que produce un estado que el sistema no puede
@@ -51,7 +51,9 @@ def refund(order):
 
 El pedido queda fuera de toda operación que el sistema define. No es terminal,
 así que nada lo archiva. No está declarado, así que nada lo lee. Un linter ve
-una asignación de string. `systemic` ve una violación de clausura y lo dice.
+una asignación de string. `systemic` detecta la violación de clausura internamente y reporta su
+consecuencia funcional por defecto; `full` también explica el diagnóstico
+sistémico.
 
 ## Instalación
 
@@ -113,23 +115,43 @@ aplicaron y por qué.
 
 ## Qué obtienes
 
-Un archivo Markdown en tu disco — `systemic-out/<alcance>.md`. Nunca un
-artifact, nunca una página servida desde localhost.
+Un archivo Markdown en tu disco — `systemic-out/<alcance>.md` — con dos modos
+de salida. **`functional` es el predeterminado; `full` conserva el formato
+sistémico detallado.** Ambos realizan el mismo modelado, las doce
+comprobaciones, la revisión de evidencia y la refutación. Cambia la explicación
+que recibe el lector.
 
-- **Sistemas identificados** — tabla de sistemas, objetivos, elementos,
-  operadores.
-- **Máquinas conceptuales** — diagramas mermaid de lo *declarado* y lo
-  *construido*, más la matriz estado × operador cuando la máquina es
-  suficientemente pequeña. La divergencia entre ambos diagramas suele ser lo
-  más valioso del reporte.
-- **Hallazgos** — ordenados por severidad, cada uno con el check del que
-  salió, la evidencia, el diagnóstico sistémico y una recomendación concreta.
-- **Piezas faltantes** — los componentes que el sistema necesita; dónde el
-  equipo está tallando el requisito en el tablero en vez de fabricar piezas.
-- **Límites y no verificado** — una tabla de cobertura de 12 filas que da
-  veredicto a cada check —hallazgos, limpio, o no verificable y por qué—, más
-  lo que el sistema no puede representar. Un check saltado queda visible,
-  nunca silencioso.
+| Contenido | `functional` (predeterminado) | `full` |
+|---|---|---|
+| Qué falla, cuándo ocurre y su impacto funcional | Sí, en lenguaje cotidiano | Sí, con diagnóstico sistémico |
+| Evidencia, severidad, confianza y acción correctiva | Sí | Sí |
+| Historial de reauditoría y comportamiento no verificado | Sí | Sí |
+| Sistemas, objetivos, elementos y operadores | Solo en el análisis interno | Inventario en el reporte |
+| Diagramas de estados y matrices estado × operador | Solo en el análisis interno | Incluidos cuando aplican |
+| Teoría TGS y diagnóstico por número de comprobación | Se omiten | Se incluyen |
+| Cobertura de las doce comprobaciones | Se realiza internamente; se reportan límites relevantes | Tabla completa de veredictos |
+
+### Elegir el modo de salida
+
+```text
+/systemic audita el ciclo de pedidos en src/orders
+/systemic audita el ciclo de pedidos en src/orders, output functional
+/systemic audita el ciclo de pedidos en src/orders, output full
+```
+
+Los dos primeros generan `functional`; el tercero genera `full`. Son
+peticiones en lenguaje natural a la skill, no flags de una CLI. Pedir una
+auditoría profunda o sistémica, sin elegir formato, no activa `full`.
+
+En `functional`, el hallazgo explica que reintentar un reembolso puede
+registrarlo dos veces, qué operación resulta afectada, bajo qué condición y
+qué corregir. No enseña clausura ni teoría de operadores. Conserva evidencia
+y consecuencias no verificadas; no oculta problemas independientes para
+acortar el reporte.
+
+En `full`, el mismo hallazgo también nombra la propiedad sistémica violada,
+muestra el ciclo de vida y aporta la tabla completa de cobertura.
+Cambiar de modo no reinicia el historial de reauditoría del alcance.
 
 ### Cada hallazgo lleva una etiqueta de honestidad
 
@@ -140,7 +162,10 @@ artifact, nunca una página servida desde localhost.
 | `AMBIGUITY` | Subespecificado. La skill **no adivina**: enuncia la pregunta que tu arquitecto o dueño de producto tiene que responder. |
 
 La severidad es `critical` / `high` / `medium` / `low`, calibrada por el daño
-que el hallazgo realmente causa.
+que el hallazgo realmente causa. Critical requiere evidencia de pérdida
+material grave, irreversibilidad o corrupción persistente de impacto grave;
+el dominio monetario o un valor inválido no bastan. El reporte separa impacto
+y confianza, e identifica el impacto que no pudo verificarse.
 
 Las etiquetas y severidades se mantienen en inglés en todos los idiomas, a
 propósito: son un enum, no prosa, y así los reportes siguen siendo comparables
@@ -155,20 +180,27 @@ documento. Lo que no se puede evidenciar, no se reporta.
 Todo hallazgo borrador pasa tres compuertas. Su evidencia se **relee** en la
 ubicación citada. Se intenta activamente una **refutación** — ¿la guarda está
 en el caller? ¿el dedup en un middleware? ¿la ambigüedad se resuelve dos
-secciones después? Los candidatos que mueren quedan listados como rechazados,
-con la evidencia que los mató. Y los hallazgos se **deduplican por causa
+secciones después? Los candidatos rechazados conservan evidencia de
+refutación en el análisis. `full` los lista; `functional` los menciona cuando
+afectan una decisión práctica. Los hallazgos se **deduplican por causa
 raíz**: un hallazgo por defecto, sin importar cuántos checks dispare ni en
 cuántos call sites se repita.
+Compartir recomendación no fusiona defectos independientes: si una reparación
+aislada deja la otra falla reproducible, son puntos de corrección separados.
+La presencia de middleware se verifica en rutas de fallo y también de éxito.
 
 Córrela dos veces y el segundo reporte es una re-auditoría: cada hallazgo
-clasificado como **nuevo**, **persistente** o **resuelto** contra la corrida
-anterior.
+clasificado como **nuevo**, **persistente**, **resuelto** o **no verificado**
+contra la corrida anterior. Resolver exige evidencia actual de corrección o
+un cambio explícito de contrato; trasladar código a un servicio no disponible
+deja un antecedente no verificado. Se reportan los cuatro conteos, incluidos
+los ceros.
 
-## Un ejemplo real
+## Un ejemplo en modo full
 
 Corrida contra un módulo de pedidos deliberadamente roto
-([`evals/fixtures/orders/`](evals/fixtures/orders/)), el reporte lee la matriz
-así:
+([`evals/fixtures/orders/`](evals/fixtures/orders/)), el reporte `full` lee la
+matriz así:
 
 > De 56 celdas de la matriz estado × operador, **una sola columna** está
 > correctamente cerrada (`deliver`) y **43 son huecos**. `add_item` y
@@ -213,23 +245,28 @@ las severidades se mantienen como keywords fijos.
 ## Estructura
 
 ```
-SKILL.md                      la skill: fases, estructura del reporte, reglas
+SKILL.md                      análisis compartido, modos y reglas
 references/
   gst-framework.md            el vocabulario conceptual, se lee antes de la fase 1
   checks.md                   cómo detectar cada uno de los 12, se lee en la fase 2
+  output-functional.md        formato funcional (predeterminado)
+  output-full.md              formato sistémico detallado
 evals/
-  evals.json                  8 evals con aserciones
+  evals.json                  13 evals con aserciones
   fixtures/orders/            módulo de código con 9 defectos sembrados
   fixtures/rental-doc/        documento de diseño con 7 defectos sembrados
   fixtures/booking-saga/      saga con compensaciones: fallo parcial y bucles
   fixtures/clean-ticket/      ciclo de vida correcto: control de falsos positivos
-  fixtures/guarded-elsewhere/ cuatro trampas defendidas junto a un defecto real
+  fixtures/guarded-elsewhere/ defensas reales y defectos de refund/recuperación
   fixtures/rerun/             un reporte previo: siembra la eval de re-auditoría
+  fixtures/rerun-external/    sucesor ausente: re-auditoría no verificada
+  fixtures/independent-ledgers/ causas separadas e impacto acotado
+  test_adversarial_fixtures.py contraejemplos ejecutables de las fixtures
 ```
 
 ## Evals
 
-`evals/evals.json` tiene ocho casos con aserciones explícitas:
+`evals/evals.json` tiene trece casos con aserciones explícitas:
 
 1. **seeded-defects-code** — 9 defectos sembrados en un módulo Python.
 2. **design-doc-only** — un documento de diseño sin código; verifica que la
@@ -239,20 +276,50 @@ evals/
    inglés; verifica que la petición explícita gane y las etiquetas no se
    traduzcan.
 5. **saga-compensations-and-loops** — una saga con compensaciones; ejercita
-   los checks 6 y 12, que las otras fixtures apenas tocan.
+   los checks 6 y 12, incluido el timeout condicional sin inventar una
+   distribución de latencias.
 6. **clean-code-no-false-positives** — un módulo deliberadamente correcto.
    Todas las demás fixtures premian encontrar cosas; ésta se califica por lo
    que la skill **no** reporta. Una corrida que «encuentra más» aquí es una
    corrida peor.
 7. **guarded-elsewhere-refutation** — cuatro defectos aparentes, cada uno
    defendido en otra capa (un decorator, un middleware, un caller que guarda,
-   un total sincronizado), junto a un defecto real. Se califica por rechazar
-   las trampas sin dejar de atrapar el real.
+   un total sincronizado). Rechaza falsas ausencias de defensas y detecta causas
+   independientes de replay de refund, elegibilidad y recuperación de pagos
+   fallidos, además de deriva condicionada por líneas mutables retenidas.
+   Se permiten hallazgos adicionales respaldados por evidencia.
 8. **re-audit-diff** — una segunda corrida sobre el módulo de pedidos con un
    reporte previo presente; verifica que los hallazgos salgan clasificados
-   como nuevo / persistente / resuelto.
+   como nuevo / persistente / resuelto / no verificado, exigiendo evidencia
+   positiva para resolver.
+9. **re-audit-unavailable-successor** — comportamiento trasladado a un servicio
+   externo no disponible: el antecedente queda no verificado, no resuelto.
+10. **independent-causes-and-bounded-impact** — defectos independientes en dos
+   saldos, un snapshot histórico correcto y severidad acorde al impacto
+   demostrado. Una recomendación similar no fusiona causas independientes.
+
+11. **default-functional-output** — sin modo explícito: impacto funcional,
+    evidencia y acciones, sin teoría ni artefactos de modelado.
+12. **explicit-full-output** — selecciona el formato detallado sobre las mismas
+    facturas, conservando sus hallazgos funcionales.
+13. **functional-re-audit-from-full** — un reporte full anterior no cambia el
+    modo predeterminado ni borra un antecedente no verificable.
 
 Sustituye `<SKILL_DIR>` por la ruta absoluta de la skill al correrlas.
+Las evals 8, 9 y 13 requieren sembrar primero su reporte previo en el directorio
+aislado de trabajo; el setup está documentado en `evals/evals.json`. Los casos
+1–10 piden `full`; los casos 11–13 ejercitan la selección y el historial entre
+modos.
+
+Ejecuta los contraejemplos de las fixtures con:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -v
+```
+
+Estas pruebas verifican las trazas causales de las fixtures; no califican un
+reporte del modelo. Valida el skill con ejecuciones aisladas contra las
+aserciones de cada caso.
 
 Las evals 6 y 7 son las que más importan a medida que la skill cambia. Una
 herramienta que reporta problemas vale lo que valga su tasa de falsos

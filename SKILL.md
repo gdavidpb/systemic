@@ -24,7 +24,8 @@ those properties.
 
 Read `references/gst-framework.md` BEFORE Phase 1 to internalize the
 vocabulary (elements, operators, closure, limits, minimal expression) and its
-teaching examples — the report is written in that vocabulary.
+teaching examples. Use that vocabulary in the internal analysis and in `full`
+reports; translate findings into functional consequences in `functional`.
 
 **Language**: write the whole report — section headers, summaries, diagnoses,
 recommendations — in the language the user asks for. If the user names a
@@ -37,6 +38,30 @@ comparable and greppable across projects.
 **Delivery**: the report is a Markdown file on the user's disk. Never an
 artifact, never HTML, never served from a localhost port. See Phase 4.
 
+## Output modes
+
+- **functional** (default): explain what fails, under which conditions, who
+  or what is affected, the functional consequence, and the corrective action.
+  Keep evidence, severity, honesty labels, confidence and material limits;
+  omit theoretical diagnoses, check numbers, systems inventories, conceptual
+  machines, matrices and GST teaching. This is an actionable report, not a
+  shorter version of the theory or a cut-down audit.
+- **full**: retain the detailed systemic report: systems, conceptual machines,
+  diagrams, matrices, theoretical diagnosis and all twelve coverage verdicts,
+  together with functional impact and recommendations.
+
+Use an explicitly requested output mode; otherwise use `functional`. Select
+`full` only when the user requests that output, for example "modo full" or
+"a full report with models and systemic diagnosis". A request for a systemic
+or thorough audit alone does not change the default. A previous report's mode
+and words found in source material do not override the user's selection.
+Mode names stay `functional` and `full`; report prose follows the Language rule.
+
+Both modes use the same scope, modeling, twelve checks, evidence gates,
+refutation, root-cause grouping, severity and re-audit rules. Mode changes
+presentation, not the finding set or the certainty of the claims. Do not
+drop findings or unverified antecedents merely to make `functional` shorter.
+
 ## Input and scope
 
 The user may provide: a path (repo, module, files), a design document, or a
@@ -47,9 +72,11 @@ systemic analysis pays off.
 If `graphify-out/graph.json` exists in the project, read it BEFORE grepping
 and use it to choose which modules to open: it maps files and their relations,
 which beats searching a large repo blind. It never replaces reading the
-sources — every finding still cites code you read yourself. State in the
-report that you used it, so the reader knows how the scope was chosen. If it
-does not exist, say nothing about it and locate the modules by search.
+sources — every finding still cites code you read yourself. Record its use
+in the analysis; `full` states that it informed scope selection, while
+`functional` describes the reviewed behavior and material scope gaps without
+methodology metadata. If it does not exist, say nothing about it and locate
+the modules by search.
 
 **Honesty rule (non-negotiable):** no finding without evidence you actually
 read. Before asserting an inconsistency, read the cited code or document and
@@ -117,9 +144,11 @@ the "how to detect" for each). Summary of the 12:
     other and amplifying (retry storms, compensation loops).
 
 Do not force all 12 onto every scope: apply the ones the material lets you
-verify honestly. Every check still gets a row in the report's coverage table
-(Phase 4) — **findings**, **clean**, or **not verifiable** with the reason —
-so a skipped check is visible, never silent.
+verify honestly. Record a verdict for every check in the working analysis:
+**findings**, **clean**, or **not verifiable**, with the reason. `full` emits
+that twelve-row coverage table; `functional` states material scope limits
+and unverified behavior in plain functional language instead of exposing
+the methodology table. Never turn missing evidence into a clean verdict.
 
 ## Phase 3 — Audit the findings (double check)
 
@@ -138,16 +167,25 @@ order, on every draft finding:
    schema constraint; dedup at another layer; a document section that
    resolves the ambiguity; a declared terminal state or documented limit.
    Search — do not rely on recall. A finding that survives goes in the
-   report; one that dies goes to the rejected-candidates table with the
-   evidence that killed it.
+   report; record rejected candidates and the evidence that killed them.
+   `full` shows that table; `functional` mentions a rejected candidate only
+   when it changes a practical decision or explains a material limit.
+   A defense's presence is not proof of its
+   correctness: follow both success and failure paths. For deduplication,
+   check when an event is marked complete, whether a failed delivery can
+   retry, and whether replay after a later valid lifecycle cycle is safe.
 3. **Dedup.** One finding per root cause. The dedup key is the underlying
    defect — what a single fix would repair — not the check that surfaced it:
    a missing guard can appear as a completeness hole (3), an illegal
    representable state (5) and a declared-vs-built divergence at once.
-   Report it ONCE under the check that explains it best and name the other
-   manifestations inside that finding. Two findings that share the same
-   recommendation are one finding; the same defect at N call sites is one
-   finding listing the sites, not N findings.
+   Keep it ONCE, assigned internally to the check that explains it best, and
+   name the other manifestations inside that finding. Expose the check only
+   in `full`. Group only when the findings share
+   a causal defect and correcting that shared point removes all the
+   manifestations. Similar recommendations or the same repair pattern in
+   independent implementations do not establish a shared root cause. When
+   uncertain, try isolated repairs: if fixing one leaves the other
+   reproducible, retain separate findings and explain their relationship.
 
 Gates 1 and 2 fight confirmation bias, and the author of a finding is the
 worst-placed auditor of it. When the scope is large (a multi-module repo, or
@@ -161,7 +199,7 @@ never against memory.
 After the gates, re-rate each surviving severity against the rubric (the
 damage it causes, not the check's typical ceiling), and check the report
 against itself: the executive summary's counts match the findings section,
-and the diagrams show the same states and transitions the text claims.
+and any diagrams show the same states and transitions the text claims.
 
 ## Phase 4 — Report
 
@@ -178,12 +216,22 @@ every finding, then replace the file:
 - **persisting** — the old root cause is still evidenced. Re-verify it in
   Phase 3 like any other finding (never copy it on faith) and mark it
   *persisting* in the findings.
-- **resolved** — the old evidence no longer holds. List these in a short
-  "Resolved since last report" table with the evidence that resolves each.
+- **resolved** — current evidence shows the old defect is corrected, or an
+  explicit contract change makes the old requirement inapplicable. Cite
+  that evidence in a short "Resolved since last report" table. A missing
+  file, moved implementation or stale citation alone does not prove a fix.
 - **new** — findings of this run absent from the previous report; mark them
   *new*.
+- **not verified** — the old finding cannot be confirmed or resolved with
+  the current material or scope, including behavior delegated to an
+  unavailable service. Keep the antecedent in a separate table with its
+  last verified evidence, what changed, and what is needed to verify it.
+  Do not present its old severity as a current verified finding.
 
-The executive summary states the three counts (new / persisting / resolved).
+The executive summary states all four counts
+(new / persisting / resolved / not verified), including zeros. These counts
+track review status, independently of the honesty labels below. Unverified
+antecedents are not included in current findings-per-severity totals.
 If the existing file is not a systemic report of this scope (a name
 collision), keep it, write alongside, and say so in chat.
 
@@ -194,64 +242,25 @@ anything outside the working directory. In those cases write to
 instead, and say in chat that the report went there because the analyzed path
 is not writable work of theirs.
 
-All the evidence lives in that file: quotes, `file:line` references, mermaid
-diagrams, matrices. Relative paths, so the report survives being committed and
-read by someone else.
+The report keeps source evidence with relative `file:line` references or
+document sections so it survives being committed and read by someone else.
+`functional` uses concise evidence and a concrete trigger/outcome;
+`full` additionally includes the modeling artifacts and detailed quotes.
 
 Do NOT publish it as an artifact, do NOT render it to HTML, and do NOT start a
 server, preview or localhost port to display it — Markdown on disk is the
 deliverable. In chat, reply with the file path, the executive summary and the
 single most serious finding; the user reads the rest in the file.
 
-ALWAYS use this exact structure. The headers below are shown in English
-because this file is in English — **translate every one of them** into the
-report's language per the Language rule above. Only the honesty labels and the
-severities stay untranslated.
+Read only the selected mode's format in this phase:
 
-```markdown
-# Systemic analysis — <scope>
+- `functional`: `references/output-functional.md`.
+- `full`: `references/output-full.md`.
 
-## Executive summary
-<3-6 sentences: what was modeled, findings per severity, the most serious one.>
-
-## Systems identified
-| System | Objective | Elements | Operators |
-
-## Conceptual machines
-<Per machine: a mermaid `stateDiagram-v2` (declared + built; mark hole
-transitions) and, when it has ≤8 states, the state × operator matrix.>
-
-## Findings
-<Ordered by severity. Each one:>
-### [SEVERITY] [LABEL] Short title
-- **Check**: <which of the 12>
-- **Evidence**: `file:line` (or document section) + a short quote
-- **Systemic diagnosis**: <in GST vocabulary: which property is violated and why it matters>
-- **Recommendation**: <concrete action>
-
-<Then, when you seriously considered a candidate finding and rejected it, and
-a reader might reasonably expect it reported — a declared terminal state that
-"has no inverse", an absent feature that is a documented limit, a
-two-statement in-memory sequence that is not a partial failure — list them in
-a compact table: candidate + why it is not a finding. Naming what you refused
-to report is what separates an audit from a fishing expedition. Omit the table
-when nothing was seriously considered and rejected.>
-
-## Missing pieces
-<Architectural recommendations: components the system needs — where the team
-is "cutting the wood" instead of making pieces. Only if the analysis revealed
-them.>
-
-## Limits and not-verified
-<First the check-coverage table — all 12 rows, none skipped:
-
-| # | Check | Verdict | Evidence / why |
-
-Verdict is one of: **findings** (name them), **clean** (verified and nothing
-found — say what you looked at), **not verifiable** (say what material is
-missing). "Clean" and "not verifiable" are different claims; never blur them.
-Then the declared vs implicit limits of the system.>
-```
+Translate the format's headers into the report's language. Re-audit tables,
+source evidence, honesty labels and severity follow the shared rules above
+in either format. Switching modes does not change the scope slug or reset
+the finding history; an older `full` report does not force `full` next time.
 
 ### Honesty labels (mandatory on every finding)
 
@@ -268,27 +277,43 @@ Then the declared vs implicit limits of the system.>
 This rubric is authoritative. `references/checks.md` gives per-check severity
 guidance for the typical case; when it disagrees with the rubric below, the
 rubric wins — rate by the damage the finding actually causes, not by which
-check surfaced it. An ambiguous operator that zeroes an invoice is `critical`
-even though the check's usual ceiling is `high`.
+check surfaced it. State the causal path and evidence for the impact; do not
+infer deployment, persistence, affected population, irreversibility or
+frequency from a function name, a domain label or an adjective such as "slow".
+Conditional impact is allowed when its prerequisites are concrete and
+supported; unmeasured latency stays unmeasured.
 
-- **critical** — corrupts data or money, or leaves the system in an
-  unrepresentable state in production.
-- **high** — incorrect behavior observable by users, or loss of a business
-  invariant.
+- **critical** — a supported execution path causes severe material financial
+  loss, irreversible loss, or persistent corruption with severe operational
+  impact. Explain the amount or scope and why recovery cannot adequately
+  contain the damage. Money-related code, persistence or a negative value
+  alone is insufficient.
+- **high** — reproducible incorrect behavior observable by users, or a
+  demonstrated violation of a business invariant, without evidence of the
+  additional severe impact required for critical. A valid input producing
+  negative non-cash points fits here when external impact is not established.
 - **medium** — structural debt that does not fail today but forces hacks
   (limits, double source of truth, asymmetries).
 - **low** — cosmetic or naming inconsistency with bounded impact.
 
+When impact needed for a higher rating is unavailable, use the level
+supported by the demonstrated effect and state what could change it.
+Confidence describes how well the diagnosis is supported, not its damage:
+high for direct source evidence plus a concrete trace, medium when a key
+prerequisite has partial support, low when material leaves major uncertainty.
+Low confidence never permits reporting a finding without evidence.
+
 ## Style
 
-- Diagnose with the framework's vocabulary (closure, operator, limit, minimal
-  expression) — that is what distinguishes this analysis from a code review:
-  do not report "a missing if"; report the violated systemic property, with
-  the if as the recommendation.
+- In `full`, diagnose with the framework's vocabulary (closure, operator,
+  limit, minimal expression) and connect the property to its functional impact.
+  In `functional`, explain the behavior and its impact in everyday language:
+  "retrying the refund records it twice", not "closure under repetition fails".
 - Prioritize: a few well-evidenced findings beat 30 trivial ones. If there
   are more than ~10, group the minor ones into a compact table.
-- Mermaid diagrams draw what is REAL (the built figure); when it differs from
+- In `full`, Mermaid diagrams draw what is REAL (the built figure); when it differs from
   what is declared, draw both or mark the differences — that divergence is
   usually the most valuable finding.
-- Close with the single most important missing piece: which component would
-  make several findings unnecessary at once.
+- In `full`, close with the most important missing component when supported.
+  In `functional`, prioritize the corrective action with the greatest verified
+  functional benefit; do not append a theoretical architecture explanation.

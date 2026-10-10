@@ -3,8 +3,8 @@
 *[Léelo en español](README.es.md)*
 
 **A Claude Code skill that audits software the way General Systems Theory
-audits a system — and reports the properties it violates, not the lines it
-got wrong.**
+audits a system — with functional findings by default and a detailed systemic
+report on request.**
 
 Most serious bugs are not typos. They are violations of systemic properties:
 an operation that produces a state the system cannot represent, an operator
@@ -49,7 +49,8 @@ def refund(order):
 
 The order is now outside every operation the system defines. Not terminal, so
 nothing archives it. Not declared, so nothing reads it. A linter sees a string
-assignment. `systemic` sees a closure violation and says so.
+assignment. `systemic` detects the closure violation internally and reports its functional
+consequence by default; `full` also explains the systemic diagnosis.
 
 ## Install
 
@@ -111,21 +112,42 @@ apply and why.
 
 ## What you get
 
-A Markdown file on your disk — `systemic-out/<scope>.md`. Never an artifact,
-never a page served from localhost.
+A Markdown file on your disk — `systemic-out/<scope>.md` — with two output
+modes. **`functional` is the default; `full` retains the detailed systemic
+format.** Both perform the same modeling, twelve checks, evidence review and
+refutation. The difference is the explanation presented to the reader.
 
-- **Systems identified** — a table of systems, objectives, elements, operators.
-- **Conceptual machines** — mermaid state diagrams of what is *declared* and
-  what is *built*, plus a state × operator matrix when the machine is small
-  enough. The divergence between the two diagrams is usually the most valuable
-  thing in the report.
-- **Findings** — ordered by severity, each with the check it came from, the
-  evidence, the systemic diagnosis, and a concrete recommendation.
-- **Missing pieces** — the components the system needs; where the team is
-  carving the requirement out of the board instead of making pieces first.
-- **Limits and not-verified** — a 12-row coverage table giving every check a
-  verdict — findings, clean, or not verifiable and why — plus what the system
-  cannot represent. A skipped check is visible, never silent.
+| Content | `functional` (default) | `full` |
+|---|---|---|
+| What fails, when and its functional impact | Yes, in everyday language | Yes, with systemic diagnosis |
+| Evidence, severity, confidence and corrective action | Yes | Yes |
+| Re-audit history and unverified behavior | Yes | Yes |
+| Systems, objectives, elements and operators | Internal analysis only | Reported inventory |
+| State diagrams and state × operator matrices | Internal analysis only | Included when applicable |
+| GST theory and numbered check diagnosis | Omitted | Included |
+| Twelve-check coverage | Performed internally; material limits reported | Full verdict table |
+
+### Choose the output mode
+
+```text
+/systemic audit the order lifecycle in src/orders
+/systemic audit the order lifecycle in src/orders, output functional
+/systemic audit the order lifecycle in src/orders, output full
+```
+
+The first two produce `functional`; the third produces `full`. These are
+natural-language skill requests, not CLI flags. Asking for a thorough or
+systemic audit alone does not select `full`.
+
+In `functional`, a finding explains that retrying a refund can record it twice,
+which operation is affected, what condition enables it and what to correct.
+It does not teach closure or operator theory. Findings retain source evidence
+and unverified impact; this mode does not hide independent problems to shorten
+the report.
+
+In `full`, the same finding additionally names the violated systemic property,
+shows the relevant lifecycle and supplies the complete check-coverage table.
+Changing mode does not reset the scope's re-audit history.
 
 ### Every finding is labeled for honesty
 
@@ -136,7 +158,10 @@ never a page served from localhost.
 | `AMBIGUITY` | Underspecified. The skill does **not** guess; it states the question your architect or product owner has to answer. |
 
 Severity is `critical` / `high` / `medium` / `low`, rated by the damage the
-finding actually causes.
+finding actually causes. Critical requires supported severe material loss,
+irreversibility or persistent corruption with severe impact; a monetary
+domain or invalid value alone is insufficient. Reports distinguish impact
+from confidence and explicitly identify impact that could not be verified.
 
 **The honesty rule is non-negotiable**: no finding without evidence actually
 read. Every claim cites `file:line` or a document section. If it cannot be
@@ -147,17 +172,24 @@ evidenced, it is not reported.
 Every draft finding passes three gates. Its evidence is **re-read** at the
 cited location. A **refutation** is actively attempted — is the guard in a
 caller? the dedup in a middleware? the ambiguity resolved two sections later?
-Candidates that die are listed as rejected, with the evidence that killed
-them. And findings are **deduplicated by root cause**: one finding per
+Rejected candidates keep their refuting evidence in the analysis. `full` lists
+them; `functional` mentions them only when they affect a practical decision.
+Findings are **deduplicated by root cause**: one finding per
 defect, however many checks it trips and however many call sites repeat it.
+Sharing a recommendation does not merge independent defects: an isolated fix
+that leaves the other failure reproducible establishes separate repair points.
+The presence of middleware is verified on failure paths as well as success.
 
 Run it twice and the second report is a re-audit: every finding classified
-**new**, **persisting** or **resolved** against the previous run.
+**new**, **persisting**, **resolved** or **not verified** against the previous
+run. Resolution requires current evidence of correction or an explicit
+contract change; moving code to an unavailable service leaves an unverified
+antecedent. All four status counts are reported, including zeros.
 
-## A real example
+## A full-mode example
 
 Run against a deliberately broken orders module ([`evals/fixtures/orders/`](evals/fixtures/orders/)),
-the report reads the matrix like this:
+the `full` report reads the matrix like this:
 
 > Of 56 cells in the state × operator matrix, **one column** is properly
 > closed (`deliver`) and **43 are holes**. `add_item` and `apply_discount` are
@@ -202,23 +234,28 @@ comparable and greppable across projects.
 ## Layout
 
 ```
-SKILL.md                      the skill: phases, report structure, rules
+SKILL.md                      shared analysis, mode selection and rules
 references/
   gst-framework.md            the conceptual vocabulary, loaded before phase 1
   checks.md                   how to detect each of the 12, loaded in phase 2
+  output-functional.md        functional report format (default)
+  output-full.md              detailed systemic report format
 evals/
-  evals.json                  8 evals with assertions
+  evals.json                  13 evals with assertions
   fixtures/orders/            a code module with 9 seeded defects
   fixtures/rental-doc/        a design document with 7 seeded flaws
   fixtures/booking-saga/      a compensating saga: partial failure and loops
   fixtures/clean-ticket/      a correct lifecycle: the false-positive control
-  fixtures/guarded-elsewhere/ four defended traps beside one real defect
+  fixtures/guarded-elsewhere/ defended paths plus refund/recovery defects
   fixtures/rerun/             a previous report: seeds the re-audit eval
+  fixtures/rerun-external/    a missing successor: unverified re-audit
+  fixtures/independent-ledgers/ separate causes and bounded impact
+  test_adversarial_fixtures.py executable fixture counterexamples
 ```
 
 ## Evals
 
-`evals/evals.json` holds eight cases with explicit assertions:
+`evals/evals.json` holds thirteen cases with explicit assertions:
 
 1. **seeded-defects-code** — 9 planted flaws in a Python module, self-contained.
 2. **design-doc-only** — a design document with no code; verifies the skill
@@ -227,19 +264,46 @@ evals/
 4. **explicit-report-language** — a Spanish prompt requesting an English
    report; verifies the explicit request wins and the labels stay untranslated.
 5. **saga-compensations-and-loops** — a saga with compensations; exercises
-   checks 6 and 12, which the other fixtures barely touch.
+   checks 6 and 12, including conditional timeout behavior without inventing
+   a latency distribution.
 6. **clean-code-no-false-positives** — a deliberately correct module. Every
    other fixture rewards finding things; this one is graded on what the skill
    does **not** report. A run that "finds more" here is a worse run.
 7. **guarded-elsewhere-refutation** — four apparent defects, each defended in
    another layer (a decorator, a middleware, a guarding caller, a
-   synchronized total), beside one real defect. Graded on rejecting the traps
-   while still catching the real one.
+   synchronized total). Rejects false absence-of-defense claims while finding
+   independent refund replay, refund eligibility and failed-payment recovery
+   defects, plus conditional drift through retained mutable line items.
+   Additional evidence-backed findings are permitted.
 8. **re-audit-diff** — a second run over the orders module with a previous
    report in place; verifies findings come out classified new / persisting /
-   resolved.
+   resolved / not verified, with positive evidence required for resolution.
+9. **re-audit-unavailable-successor** — behavior moved to an unavailable
+   external service; the old finding remains not verified, not resolved.
+10. **independent-causes-and-bounded-impact** — independent wallet/loyalty
+   defects, a valid historical snapshot and severity calibrated to demonstrated
+   impact. Similar repairs must not collapse independent roots.
+
+11. **default-functional-output** — no mode specified: functional impact,
+    evidence and actions, without theory or modeling artifacts.
+12. **explicit-full-output** — explicitly selects the detailed format for the
+    same invoice fixture, preserving its functional findings.
+13. **functional-re-audit-from-full** — an older full report does not override
+    the default or erase an unverified antecedent.
 
 Substitute the skill's absolute path for `<SKILL_DIR>` when running them.
+Evals 8, 9 and 13 require seeding their previous report into the isolated working
+directory first; the setup is documented in `evals/evals.json`. Cases 1–10 explicitly request
+`full`; 11–13 exercise output selection and history across modes.
+
+Run the executable fixture counterexamples with:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -v
+```
+
+These tests verify the fixtures' causal traces, not a model's report. Evaluate
+the skill itself with isolated forward runs against the case assertions.
 
 Evals 6 and 7 are the ones that matter most as the skill changes. A tool that
 reports problems is only as useful as its false-positive rate, and every other

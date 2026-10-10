@@ -1,9 +1,10 @@
 # Conceptual framework — GST applied to software engineering
 
 This file distills General Systems Theory as applied to software design; the
-skill's report is written in this vocabulary. The concepts are
-language-independent — keep them, and translate the prose into whatever
-language the report is being written in.
+internal analysis and `full` report use this vocabulary. A `functional` report
+translates the conclusions into behavior, impact and corrective action without
+teaching the framework. The concepts are language-independent; report prose
+follows the user's requested language.
 
 ## Definition
 

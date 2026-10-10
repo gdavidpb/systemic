@@ -1,12 +1,12 @@
 {
   "skill_name": "systemic",
-  "notes": "Evals 1, 2, 4, 5, 6 and 7 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1's fixtures to test report-language selection; 5 targets checks 6 and 12, which the other fixtures barely exercise; 6 is the false-positive control — its fixture has no seeded defects and it is graded mainly on what the skill does NOT report, so a run that 'finds more' is a worse run; 7 is the refutation control — four apparent defects are defended in other layers and must be rejected while the one real defect beside them is still caught). Eval 8 reuses eval 1's prompt and fixtures but needs one setup step: copy evals/fixtures/rerun/previous-orders-module.md to <working-dir>/systemic-out/orders-module.md BEFORE the run, so the skill finds a previous report of the same scope and takes the re-audit path. Substitute the absolute path of the skill directory for <SKILL_DIR> when running them. Eval 3 is a template that needs a target repo supplied at run time — any codebase with a stateful lifecycle works; it must NOT hardcode a specific project. Runs write a report under systemic-out/; because the fixtures are a fixture directory and not the grader's own project, the skill should place it under the working directory rather than inside evals/fixtures/. Clean it between runs so a stale file is not mistaken for a fresh one (for eval 8, cleaning means re-seeding the previous report, not deleting it).",
+  "notes": "Evals 1, 2, 4, 5, 6, 7, 9 and 10 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1; 5 targets partial failure and loops; 6 is the clean false-positive control; 7 distinguishes actual defenses from independent refund and failed-payment recovery defects; 9 tests an unverified re-audit antecedent; 10 tests independent root causes, historical snapshots and impact-based severity). Evals 8 and 9 need setup: copy their previous-orders-module.md to <working-dir>/systemic-out/orders-module.md BEFORE the run. Substitute the absolute skill path for <SKILL_DIR>. Eval 3 is a template requiring a real target supplied at runtime. Reports go under systemic-out/ in the working directory, outside the fixture directories. Isolate runs to prevent stale reports; for re-audits seed the correct previous report. No expected finding count forbids additional evidence-backed defects. Assertions evaluate causal evidence and impact, not agreement with a preferred phrasing. Output selection is tested separately: cases 1-10 explicitly request full to preserve their detailed-format assertions; 11 uses no mode and must default to functional; 12 explicitly requests full on the same invoice fixture; 13 reauds an older full report in default functional mode. Case 13 requires the same previous-report setup as 9. Both modes keep evidence, labels, confidence, impact limits and finding history; only presentation differs.",
   "evals": [
     {
       "id": 1,
       "name": "seeded-defects-code",
-      "prompt": "Run a systemic analysis of the orders module at <SKILL_DIR>/evals/fixtures/orders/ (README.md, models.py, operations.py, webhook.py). I want to find inconsistencies in its states and operations before it reaches production.",
-      "expected_output": "A report following the skill's exact structure that models the orders system (elements, operators, declared vs built machine) and detects the 9 seeded flaws with file:line evidence, honesty labels and calibrated severities, plus a missing-piece synthesis.",
+      "prompt": "Run a systemic analysis of the orders module at <SKILL_DIR>/evals/fixtures/orders/ (README.md, models.py, operations.py, webhook.py). I want to find inconsistencies in its states and operations before it reaches production. Use output full.",
+      "expected_output": "A report following the skill's exact structure that models the orders system (elements, operators, declared vs built machine) and covers the seeded obligations without imposing a maximum finding count with file:line evidence, honesty labels and calibrated severities, plus a missing-piece synthesis.",
       "files": [
         "evals/fixtures/orders/README.md",
         "evals/fixtures/orders/models.py",
@@ -23,7 +23,7 @@
         "Detects the idempotency flaw: handle_payment_webhook() has no dedup by event_id although the README warns the provider retries/duplicates — rated critical or high (duplicate Payment records and an inflated total_paid)",
         "Detects the double source of truth: Order.total stored while calc_total() exists, and add_item() does not update total — rated high (the webhook decides paid using the drifting stored total)",
         "Detects the partial-failure risk in ship(): inventory reserved, courier.notify may raise, status not yet written, no transaction/compensation — rated critical or high",
-        "Severities are calibrated per finding, not uniform: at least one finding is rated critical and the unreachable in_review stays at medium — a report assigning one severity across the board fails this",
+        "Severities are calibrated by demonstrated impact, not uniform or domain labels: unreachable in_review stays medium; a critical rating needs supported severe consequences. No critical finding is mandatory solely because money or persisted data is involved.",
         "Report includes a mermaid state diagram",
         "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY)",
         "Every finding carries a severity (critical/high/medium/low)",
@@ -32,13 +32,16 @@
         "No two findings share a root cause: a defect that surfaces under several checks (e.g. cancel()'s missing guard as both a transition hole and the declared-vs-built contradiction) appears as ONE finding that names the other manifestation, not as two findings",
         "Report includes a missing-piece/root-cause synthesis (e.g. a single guarded transition operator would prevent several findings at once)",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
-        "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report"
-      ]
+        "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report",
+        "Every finding states demonstrated impact, impact not verified and confidence with an evidence basis; confidence and severity are independent.",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
     },
     {
       "id": 2,
       "name": "design-doc-only",
-      "prompt": "Here is a design document for an equipment rental feature: <SKILL_DIR>/evals/fixtures/rental-doc/DESIGN.md. Without looking at any code, is the described design systemically consistent? What ambiguities or holes does the document have?",
+      "prompt": "Here is a design document for an equipment rental feature: <SKILL_DIR>/evals/fixtures/rental-doc/DESIGN.md. Without looking at any code, is the described design systemically consistent? What ambiguities or holes does the document have? Use output full.",
       "expected_output": "A document-only systemic analysis: models the rental lifecycle as a conceptual machine (mermaid), and surfaces the seeded contradictions, ambiguities and holes citing only sections/lines of the document, with honesty labels and severities.",
       "files": [
         "evals/fixtures/rental-doc/DESIGN.md"
@@ -56,13 +59,15 @@
         "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY)",
         "Every finding carries a severity (critical/high/medium/low)",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
-        "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report"
-      ]
+        "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
     },
     {
       "id": 3,
       "name": "real-repo-lifecycle",
-      "prompt": "Run a systemic analysis of the <LIFECYCLE> state machine in <TARGET_REPO_PATHS>. Is the lifecycle consistent?",
+      "prompt": "Run a systemic analysis of the <LIFECYCLE> state machine in <TARGET_REPO_PATHS>. Is the lifecycle consistent? Use output full.",
       "expected_output": "Models the target lifecycle from the real code: its actual states (no invented ones), operators mapped to transitions, mermaid diagram of the built machine, findings with file:line evidence, honesty labels and severities, and a limits/not-verified section.",
       "files": [],
       "assertions": [
@@ -75,13 +80,16 @@
         "Report includes a limits/not-verified section with the 12-row check-coverage table: every check gets a verdict (findings / clean / not verifiable) and 'not verifiable' rows state what material is missing",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
         "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report",
-        "CONDITIONAL — only if the target repo has graphify-out/graph.json: the report states that the graph was used to choose which modules to open, and findings still cite sources read directly. If the target has no graphify-out/, the report must not mention it at all"
-      ]
+        "CONDITIONAL — only if the target repo has graphify-out/graph.json: the report states that the graph was used to choose which modules to open, and findings still cite sources read directly. If the target has no graphify-out/, the report must not mention it at all",
+        "Distinguishes demonstrated impact from unavailable deployment/latency evidence; critical requires severe supported consequences and confidence is stated separately.",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
     },
     {
       "id": 4,
       "name": "explicit-report-language",
-      "prompt": "Haz un análisis sistémico del módulo de órdenes en <SKILL_DIR>/evals/fixtures/orders/, pero escribe el reporte en inglés.",
+      "prompt": "Haz un análisis sistémico del módulo de órdenes en <SKILL_DIR>/evals/fixtures/orders/, pero escribe el reporte en inglés. Use output full.",
       "expected_output": "The same systemic report as eval 1, written entirely in English because the user asked for it explicitly, even though the request itself is in Spanish — with the honesty labels and severities left as fixed keywords.",
       "files": [
         "evals/fixtures/orders/README.md",
@@ -94,13 +102,15 @@
         "Honesty labels stay as the fixed keywords INCONSISTENCY/RISK/AMBIGUITY (not translated)",
         "Severities stay as the fixed keywords critical/high/medium/low (not translated)",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
-        "Detects at least the closure violation and the missing-guard findings from eval 1 (language choice does not degrade the analysis)"
-      ]
+        "Detects at least the closure violation and the missing-guard findings from eval 1 (language choice does not degrade the analysis)",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
     },
     {
       "id": 5,
       "name": "saga-compensations-and-loops",
-      "prompt": "Run a systemic analysis of the booking saga at <SKILL_DIR>/evals/fixtures/booking-saga/ (README.md, steps.py, saga.py, worker.py). It runs across three external providers with no shared transaction and I am worried about what happens when a step fails.",
+      "prompt": "Run a systemic analysis of the booking saga at <SKILL_DIR>/evals/fixtures/booking-saga/ (README.md, steps.py, saga.py, worker.py). It runs across three external providers with no shared transaction and I am worried about what happens when a step fails. Use output full.",
       "expected_output": "A report that models the saga as a system, maps each step to its compensation, and concentrates on partial failure (check 6) and feedback loops (check 12) — the two checks the other fixtures barely exercise — with file:line evidence, honesty labels and severities.",
       "files": [
         "evals/fixtures/booking-saga/README.md",
@@ -119,18 +129,20 @@
         "Detects the alert feedback loop: every failure notifies on-call, and on_alert() re-enqueues the booking, so the alert causes the action that causes the alert (worker.py, handle + on_alert)",
         "Detects the dead-letter loop: drain_dead_letter() re-enqueues everything with no filter and nothing verifies the underlying problem was fixed, contrary to rule 6 (worker.py, drain_dead_letter)",
         "Detects that nothing ever writes to the dead-letter queue although rule 6 declares it: drain_dead_letter() drains a queue no operator fills",
-        "Detects the timeout/retry mismatch: TIMEOUT_SECONDS = 2 while rule 4 declares the providers slow, so timeouts are the expected case and feed the retry loop",
+        "Describes timeout-driven retry as conditional on cumulative provider latency exceeding TIMEOUT_SECONDS=2. Does NOT infer frequent or expected timeouts from slow alone; real latency and timeout frequency are not verifiable without measurements or explicit bounds.",
         "Names check 6 (invariants and partial failure) and check 12 (feedback loops) explicitly as the checks that carry the analysis",
         "Report includes a mermaid diagram of the saga and its compensation paths",
         "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY) and a severity",
         "Findings cite file:line evidence",
-        "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path"
-      ]
+        "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
     },
     {
       "id": 6,
       "name": "clean-code-no-false-positives",
-      "prompt": "Run a systemic analysis of the ticket module at <SKILL_DIR>/evals/fixtures/clean-ticket/ (README.md, models.py, operations.py). Is this lifecycle consistent?",
+      "prompt": "Run a systemic analysis of the ticket module at <SKILL_DIR>/evals/fixtures/clean-ticket/ (README.md, models.py, operations.py). Is this lifecycle consistent? Use output full.",
       "expected_output": "A report on a deliberately correct module: it must confirm the lifecycle is consistent, say concretely WHY it is, and resist manufacturing findings. This is the only eval whose primary signal is what the skill does NOT report — every other fixture rewards finding things, so this one measures the false-positive rate that determines whether the tool can be trusted.",
       "files": [
         "evals/fixtures/clean-ticket/README.md",
@@ -150,14 +162,16 @@
         "MAY legitimately observe that FINAL_STATUSES duplicates a fact derivable from TRANSITIONS (closed is the state with no outgoing transitions) — if reported, it must be rated low, and it is the only finding above informational that the material supports",
         "The check-coverage table gives a verdict for all twelve checks instead of forcing findings: at minimum checks 6, 8 and 12 are marked not verifiable with the reason (in-memory module, no I/O, no queues)",
         "Report still follows the full structure: systems table, mermaid state diagram, limits section",
-        "Every finding, if any, carries an honesty label and a severity"
-      ]
+        "Every finding, if any, carries an honesty label and a severity",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
     },
     {
       "id": 7,
       "name": "guarded-elsewhere-refutation",
-      "prompt": "Run a systemic analysis of the invoices module at <SKILL_DIR>/evals/fixtures/guarded-elsewhere/ (README.md, models.py, guards.py, operations.py, api.py, webhooks.py). Are its lifecycle and operations consistent?",
-      "expected_output": "A report that survives the refutation gate: the module's four apparent defects are defended in other layers (a decorator, a guarding caller, a dedupe middleware, a synchronized derived total) and must land in the rejected-candidates table, while the one real defect cluster — the refund route wired outside every defense the module built — is found and rated. Like eval 6 this is graded on what the skill does NOT report, but with a real defect present: it measures discrimination, not just restraint.",
+      "prompt": "Run a systemic analysis of the invoices module at <SKILL_DIR>/evals/fixtures/guarded-elsewhere/ (README.md, models.py, guards.py, operations.py, api.py, webhooks.py). Are its lifecycle and operations consistent? Use output full.",
+      "expected_output": "A report that rejects false absence-of-defense claims using the actual decorator, guarding caller, synchronized total and successful payment replay, while detecting independent refund eligibility, refund replay, failed-payment recovery and retained-item alias risks. Defense presence does not establish correctness on failure. Findings may be separate or grouped only if the distinct causes, traces and repair obligations remain explicit; additional evidence-backed defects are permitted.",
       "files": [
         "evals/fixtures/guarded-elsewhere/README.md",
         "evals/fixtures/guarded-elsewhere/models.py",
@@ -167,23 +181,28 @@
         "evals/fixtures/guarded-elsewhere/webhooks.py"
       ],
       "assertions": [
-        "Detects the real defect: the refund route is registered with dedupe_events=False (webhooks.py, with the TODO confession) while rule 4 declares provider retries, so a retried refund event re-runs handle_refund_event and appends a duplicate row to the REFUNDS ledger, violating rule 5's exactly-once — check 7, rated critical or high",
+        "Detects the refund replay defect: the refund route is registered with dedupe_events=False (webhooks.py, with the TODO confession) while rule 4 declares provider retries, so a retried refund event re-runs handle_refund_event and appends a duplicate row to the REFUNDS ledger, violating rule 5's exactly-once — check 7, rated critical or high",
         "Detects that handle_refund_event also bypasses the module's guard discipline: it writes status directly with no @requires_status and no caller-side check, so a refund event can 'reopen' an invoice in any status, not just paid",
+        "Detects failed-payment recovery: dedupe adds the event id before the handler succeeds; payment delivered while draft raises InvalidStatus, then issue followed by retry of that same event returns duplicate and leaves issued/unpaid. States this ordering condition and does not call it absence of middleware.",
+        "Keeps refund eligibility and replay as independent repair obligations: a paid-state guard still permits P1 -> R1 -> new P2 -> replay R1, while dedupe alone still permits a first refund on void. A common architectural recommendation does not prove one root cause.",
+        "Recognizes the concrete alias risk if demonstrated: caller keeps the LineItem passed to add_line, issues the invoice, then changes the retained item quantity; stored total and sum(items) diverge. State the caller-mutation condition, distinguish it from missing _recalc, and avoid assuming every caller does this.",
         "Does NOT report issue()/mark_overdue()/void()/add_line()/remove_line() as missing status guards: the @requires_status decorator in guards.py enforces the precondition before each body runs",
-        "Does NOT report the payment webhook as lacking idempotency: route() wraps handlers with the dedupe middleware by default and handle_payment_event is registered with that default",
-        "Does NOT report Invoice.total as a double source of truth above low: every writer of items (add_line, remove_line) calls _recalc, and items are frozen outside draft by the decorator, so no drift path exists",
+        "Does NOT claim the payment route has no deduplication or that replay of a completed successful payment reapplies it: the default wrapper suppresses that replay. This does NOT exclude evidence-backed failure-recovery findings.",
+        "Does NOT claim add_line/remove_line omit _recalc: both synchronize total on their guarded paths. This does NOT prohibit a conditional drift finding through a retained mutable LineItem alias; inspect ownership and actual accessible mutation paths rather than claiming no drift is possible.",
         "Does NOT rate _apply_payment()'s missing internal guard above low: record_payment in api.py is its only caller and enforces rule 2 before calling; a low note about the fragility of a caller-side guard is acceptable",
         "Does NOT report void() having no inverse: void is a declared terminal state, and a declared terminal is not a broken duality",
         "The rejected-candidates table names the refuted traps with the evidence that killed each one (the decorator, the middleware default, the synchronized _recalc, the guarding caller)",
         "Every reported finding carries an honesty label, a severity and file:line evidence",
-        "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path"
-      ]
+        "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
     },
     {
       "id": 8,
       "name": "re-audit-diff",
-      "prompt": "Run a systemic analysis of the orders module at <SKILL_DIR>/evals/fixtures/orders/ (README.md, models.py, operations.py, webhook.py). I want to find inconsistencies in its states and operations before it reaches production.",
-      "expected_output": "Setup places a previous narrow report at systemic-out/orders-module.md (copied from evals/fixtures/rerun/previous-orders-module.md). The skill must notice it and run as a re-audit: re-verify the old findings instead of copying them, classify everything as new / persisting / resolved, and replace the file.",
+      "prompt": "Run a systemic analysis of the orders module at <SKILL_DIR>/evals/fixtures/orders/ (README.md, models.py, operations.py, webhook.py). I want to find inconsistencies in its states and operations before it reaches production. Use output full.",
+      "expected_output": "Setup places a previous narrow report at systemic-out/orders-module.md (copied from evals/fixtures/rerun/previous-orders-module.md). The skill must notice it and run as a re-audit: re-verify the old findings instead of copying them, classify everything as new / persisting / resolved / not verified, and replace the file.",
       "files": [
         "evals/fixtures/orders/README.md",
         "evals/fixtures/orders/models.py",
@@ -196,9 +215,122 @@
         "Classifies the closure finding (refund() writes 'refund_pending') as persisting — the root cause is re-verified against the current code, not copied on faith",
         "Classifies the previous deliver()-has-no-guard finding as resolved, citing the guard now present in deliver() (operations.py) as the evidence that resolves it, in a resolved-since-last-report list or table",
         "Marks the findings the previous report missed (at minimum the webhook idempotency flaw, the discount ambiguity and the stored-total drift) as new",
-        "The executive summary states the three counts: new, persisting and resolved",
+        "The executive summary states all four counts: new, persisting, resolved and not verified, including zero not-verified antecedents in this complete-source fixture.",
         "Exactly one report remains at systemic-out/orders-module.md — the re-audit replaces the previous file rather than writing a second one alongside",
-        "The re-audit keeps the full report structure: systems table, conceptual machines, findings with labels and severities, and the check-coverage table"
+        "The re-audit keeps the full report structure: systems table, conceptual machines, findings with labels and severities, and the check-coverage table",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
+    },
+    {
+      "id": 9,
+      "name": "re-audit-unavailable-successor",
+      "prompt": "Reaudit the orders module at <SKILL_DIR>/evals/fixtures/rerun-external/. The current scope is only README.md and routes.py; do not inspect external services. A previous systemic report has been seeded at <working-dir>/systemic-out/orders-module.md. Classify every antecedent and write the report in Spanish. Use output full.",
+      "expected_output": "The old refund eligibility finding remains an unverified antecedent because behavior moved to an unavailable external service. Its disappearance from local code is not a verified resolution. The report preserves last verified evidence, the scope change and the material needed for verification.",
+      "files": [
+        "evals/fixtures/rerun-external/README.md",
+        "evals/fixtures/rerun-external/routes.py",
+        "evals/fixtures/rerun-external/previous-orders-module.md"
+      ],
+      "assertions": [
+        "Classifies the old refund status-guard finding as not verified, neither resolved nor persisting without current evidence.",
+        "States all four status counts including zero resolved and one not-verified antecedent; no verified fix is claimed.",
+        "Preserves the old evidence reference as historical, records the unavailable successor and what source or integration evidence would verify it.",
+        "Does not count the antecedent in current findings-per-severity totals.",
+        "Does not infer external refund behavior from the facade, inspect outside the requested scope or invent a new concrete defect.",
+        "Writes the report under the working directory systemic-out/ and retains the full coverage table.",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
+    },
+    {
+      "id": 10,
+      "name": "independent-causes-and-bounded-impact",
+      "prompt": "Audit the systemic consistency of the settlement service at <SKILL_DIR>/evals/fixtures/independent-ledgers/ (README.md, wallet.py, loyalty.py, statements.py), including both ledgers and statements. Write the report in Spanish. Use output full.",
+      "expected_output": "Separate wallet and loyalty invariant violations with independent repair points. Correctly rejects the immutable issuance-time statement as an intentional historical snapshot. Severity follows demonstrated impact rather than the corruption or money label; critical is not supported by this in-memory fixture alone.",
+      "files": [
+        "evals/fixtures/independent-ledgers/README.md",
+        "evals/fixtures/independent-ledgers/wallet.py",
+        "evals/fixtures/independent-ledgers/loyalty.py",
+        "evals/fixtures/independent-ledgers/statements.py"
+      ],
+      "assertions": [
+        "Shows that withdrawing 6 from balance 5 and redeeming 6 from points 5 each produce -1, contradicting the declared nonnegative invariants.",
+        "Retains independent findings for wallet and loyalty: fixing one leaves the other reproducible. Same validation recommendation does not merge roots.",
+        "Rates the non-cash points invariant violation high, not critical solely because the datum is invalid. Does not assign critical to wallet solely because its domain is money; no severe external impact is evidenced.",
+        "States demonstrated impact, confidence and unavailable persistence/deployment/external impact separately.",
+        "Rejects the historical snapshot as a double-source-of-truth defect: issuance-time balance and timestamp are intentionally immutable and need not track the live wallet.",
+        "Does not invent retry, concurrency or persistence failures unsupported by the supplied implementation.",
+        "Provides the full check-coverage table, source evidence and the local report path.",
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+      ],
+      "output_mode": "full"
+    },
+    {
+      "id": 11,
+      "name": "default-functional-output",
+      "output_mode": "functional",
+      "prompt": "Audita la consistencia sistémica del módulo de facturas en <SKILL_DIR>/evals/fixtures/guarded-elsewhere/ (README.md, models.py, guards.py, operations.py, api.py, webhooks.py). Quiero saber qué problemas afectan su funcionamiento y cómo corregirlos.",
+      "expected_output": "The default functional report in Spanish explains each verified failed behavior, trigger, functional impact and recommended action, with concise source evidence, severity, honesty label and confidence. It preserves independent refund, failed-payment and mutable-alias findings without theoretical diagnosis or modeling artifacts.",
+      "files": [
+        "evals/fixtures/guarded-elsewhere/README.md",
+        "evals/fixtures/guarded-elsewhere/models.py",
+        "evals/fixtures/guarded-elsewhere/guards.py",
+        "evals/fixtures/guarded-elsewhere/operations.py",
+        "evals/fixtures/guarded-elsewhere/api.py",
+        "evals/fixtures/guarded-elsewhere/webhooks.py"
+      ],
+      "assertions": [
+        "Uses functional by default even though the user asks for a systemic audit; does not ask for a mode unnecessarily.",
+        "Explains failed-payment retry suppression, invalid refund eligibility, delayed/repeated refund and mutable-item alias risks in functional language with explicit conditions.",
+        "Each finding retains severity, honesty label, source evidence, confidence and corrective action; separates demonstrated effect from unverified production or financial impact.",
+        "Does not include GST exposition, systemic diagnosis, check numbers, systems inventories, mermaid diagrams, state matrices or a twelve-check coverage table, including in an appendix.",
+        "Independent causes remain distinct; no finding is dropped just to shorten the report.",
+        "States material scope limits and missing verification in functional terms, without implying omitted methodology was not performed.",
+        "Writes a local Markdown report under systemic-out/ and returns the path plus functional summary."
+      ]
+    },
+    {
+      "id": 12,
+      "name": "explicit-full-output",
+      "output_mode": "full",
+      "prompt": "Audita la consistencia sistémica del módulo de facturas en <SKILL_DIR>/evals/fixtures/guarded-elsewhere/ (README.md, models.py, guards.py, operations.py, api.py, webhooks.py). Quiero output full, con modelos y diagnóstico sistémico.",
+      "expected_output": "The detailed full report in Spanish, retaining the established systems inventory, conceptual machines, diagrams, small-state matrix, systemic diagnosis, functional impact and all twelve coverage verdicts. Selecting full changes presentation rather than the finding set or evidence standard.",
+      "files": [
+        "evals/fixtures/guarded-elsewhere/README.md",
+        "evals/fixtures/guarded-elsewhere/models.py",
+        "evals/fixtures/guarded-elsewhere/guards.py",
+        "evals/fixtures/guarded-elsewhere/operations.py",
+        "evals/fixtures/guarded-elsewhere/api.py",
+        "evals/fixtures/guarded-elsewhere/webhooks.py"
+      ],
+      "assertions": [
+        "Selects full because the user explicitly requests that output.",
+        "Contains systems inventory, conceptual-machine mermaid diagram, applicable state/operator matrix, theoretical diagnosis and complete twelve-check coverage table.",
+        "Explains functional impact, triggers, confidence, demonstrated versus unverified impact and recommended action as well as systemic properties.",
+        "Covers the same independent invoice obligations as case 11; does not manufacture extra defects or weaken labels solely because full was requested.",
+        "Verifies defenses rather than claiming every apparent missing guard/dedupe/recalculation is absent.",
+        "Report prose and headings are in Spanish; fixed honesty labels and severity keywords remain unchanged."
+      ]
+    },
+    {
+      "id": 13,
+      "name": "functional-re-audit-from-full",
+      "output_mode": "functional",
+      "prompt": "Reaudita en español la fachada de órdenes en <SKILL_DIR>/evals/fixtures/rerun-external/. El alcance actual es solo README.md y routes.py. Hay un informe sistémico previo sembrado en <working-dir>/systemic-out/orders-module.md. Clasifica los antecedentes y explica su efecto funcional.",
+      "expected_output": "A default functional re-audit of the same scope despite the previous full report. The unavailable successor leaves one unverified antecedent rather than a verified resolution; historical scope/evidence remain concise and functional, without reproducing the old theory.",
+      "files": [
+        "evals/fixtures/rerun-external/README.md",
+        "evals/fixtures/rerun-external/routes.py",
+        "evals/fixtures/rerun-external/previous-orders-module.md"
+      ],
+      "assertions": [
+        "Defaults to functional; the old report format does not force full or reset the scope history.",
+        "States all four counts: zero new, persisting and resolved; one not-verified antecedent.",
+        "Preserves last verified historical evidence, the scope change and what is needed to verify the external behavior.",
+        "Describes the unresolved functional question: whether non-paid orders can be refunded; does not claim the external service accepts or rejects them without evidence.",
+        "Does not copy the old theoretical diagnosis, systems inventory or coverage table into the functional report.",
+        "Keeps unverified antecedents separate from current findings-per-severity totals and performs no out-of-scope inspection."
       ]
     }
   ]

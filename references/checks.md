@@ -9,7 +9,9 @@ queues, retries and concurrency.
 **On the severities below**: they describe the typical case for each check,
 not a ceiling. The authoritative rubric is the one in `SKILL.md` — rate by the
 damage the finding actually causes. When a check's usual severity and the
-rubric disagree, the rubric wins.
+rubric disagree, the rubric wins. A monetary domain or persisted value does
+not by itself establish critical impact; justify that threshold with the
+causal path, scale and recoverability required by the rubric.
 
 ## 1. Closure
 
@@ -20,8 +22,8 @@ constraint, docs). Then find every write to that field (assignments, UPDATE,
 `.status =`) and verify the written value belongs to the set. Also look for
 operation results with no branch that handles them (a `match`/`if-elif` with
 no case for a producible value).
-**Severity**: critical if the out-of-system state gets persisted; high if it
-only lives in memory.
+**Severity**: high for a demonstrated invalid business state; critical only
+with evidence of the rubric's severe impact, not persistence alone.
 
 ## 2. Operator ambiguity (the `A U B` problem)
 
@@ -43,8 +45,8 @@ finding — a **hole**: the operation proceeds without considering that state.
 checking the current state (missing guard). Contrast with declared rules ("a
 shipped order cannot be canceled") — a missing guard that contradicts a
 declared rule is an INCONSISTENCY, not just a hole.
-**Severity**: critical if the hole bypasses business validation (payments,
-stock); high for other holes with mutation.
+**Severity**: high for a hole that violates business validation; elevate to
+critical only when the resulting impact meets the authoritative rubric.
 
 ## 4. Reachability
 
@@ -66,7 +68,8 @@ whether any operator can write the forbidden combination (missing guard,
 partial updates) and whether the schema permits it (no constraint). The
 pattern recommendation is "make illegal states unrepresentable": model so the
 combination cannot exist (sum types, constraints, a single source field).
-**Severity**: critical when money/inventory is involved; high otherwise.
+**Severity**: high for a demonstrated forbidden combination; critical requires
+severe supported consequences beyond the money/inventory domain label.
 
 ## 6. Invariants and partial failure
 
@@ -76,7 +79,8 @@ stock ≥ 0) and what happens when the operator maintaining them fails halfway.
 external API, table + file) without a transaction or compensation. Ask: if it
 fails after write 1 and before write 2, which invariant is broken? Who
 repairs it? `TODO: transaction` comments are confessions.
-**Severity**: critical with money/stock; high with business state.
+**Severity**: high for a demonstrated broken business invariant; critical
+requires supported severe loss or corruption under the authoritative rubric.
 
 ## 7. Idempotency and re-entry (closure under repetition)
 
@@ -85,8 +89,13 @@ double click) must leave the system in the same state as applying it once.
 **Detect**: find the re-invokable entry points (webhooks, queue handlers,
 crons) and check for dedup (event id, marker, UPSERT, idempotency key). An
 `append` or `+=` in a webhook handler without dedup is the classic pattern.
-**Severity**: critical if it duplicates money/business records; high if it
-duplicates visible effects (messages, emails).
+An existing marker is not enough: trace a failed first delivery and its
+retry, and delayed replay after other valid operations. A marker written
+before successful processing may suppress recovery even if successful
+duplicates are harmless. Separate idempotency of completed effects from
+retryability after failure; use check 6 for lost progress on partial failure.
+**Severity**: high for duplicated visible effects or lost business progress;
+critical only with supported severe financial or operational impact.
 
 ## 8. Concurrency
 
@@ -95,8 +104,9 @@ duplicates visible effects (messages, emails).
 add, save); states two flows can mutate (user + job); `SELECT` then `UPDATE`
 without `FOR UPDATE`/an atomic claim. Ask whether the operators commute — if
 order changes the result and nothing serializes them, there is a lost update.
-**Severity**: critical with money; high with business state; medium if the
-window is theoretical and the domain tolerates it.
+**Severity**: high for a concrete business-state violation; critical requires
+supported severe impact. Medium if the window is theoretical and the domain
+tolerates it.
 
 ## 9. Symmetry / operator duality
 
@@ -116,6 +126,10 @@ medium if a manual exit is documented.
 invalidation event; the same concept modeled in two places with different
 update rules. Check whether ALL writers of the primitive also update the
 derived value (or vice versa) — if one does not, they already drift.
+Also trace mutable inputs or returned references: a caller retaining an item
+stored by reference may change the underlying values outside those guarded
+writers. Require a concrete accessible alias path and state its ownership
+and mutation condition; do not infer arbitrary external writes without one.
 **Severity**: high if both are used for decisions; medium if the derived one
 is presentation-only.
 
@@ -140,6 +154,9 @@ cause actions that cause alerts.
 **Detect**: map cycles in the call/event graph (retry + queue + timeout +
 trigger). Ask for the damper: backoff, circuit breaker, retry cap, dedup. A
 cycle without a damper is an amplification loop waiting for its day.
+For timeout-driven loops, state the required latency/deadline condition.
+Do not infer that timeouts are frequent merely because providers are called
+"slow"; use measurements or explicit bounds, or mark frequency not verifiable.
 **Severity**: high without a damper on a critical path; medium with a partial
 damper.
 

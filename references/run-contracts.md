@@ -64,7 +64,7 @@ Conventions:
 | `status` | `in_progress`, `needs_scope`, `complete`, `incomplete` |
 | `scope_proposal` *(text)* | required when `status` is `needs_scope` **[gate]** |
 | `incomplete_reason` *(text)* | required when `status` is `incomplete` **[gate]**; an incomplete run may keep targets that no longer exist when its reason says so |
-| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped"\|"resumed", "detail"}]` **[gate]**; `skipped` records F6 when there is no previous report; `returned_to` names in `phase` the phase returned to, and a complete run shows a later `gate_passed` for it **[gate]**; `resumed` records picking up an interrupted run |
+| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped"\|"resumed", "detail"}]` **[gate]**; `skipped` records F6 when there is no previous report; `returned_to` names in `phase` the phase returned to, and a complete run shows a later `gate_passed` for it **[gate]**; `resumed` records picking up an interrupted run; F8 logs the final `all` as `gate_passed` (or `gate_failed`), with `checked manually` in the detail when Python was unavailable |
 
 **Re-audit setup.** When `systemic-out/<slug>.md` already exists and is a
 systemic report of the same scope, F0 archives it before anything is
@@ -259,7 +259,10 @@ rest of the previous workspace, including any older `prior/`.
   `fault_injection`, `metamorphic`, modeled `operators`, and a quoted
   citation in a `role: test` file **[gate]**. Cite the test's definition
   line (or any line inside it): the validator reads the enclosing test body
-  and checks that some techniques are visible in it **[gate]**:
+  — from the nearest test definition above the cited line (`def`, `it(`,
+  `test(`, `func Test`, `@Test`) to the next definition at the same or a
+  lower indent — and checks that some techniques are visible in it
+  **[gate]**:
   - `concurrency`: a primitive that forces overlap (`Barrier`, `Event(`,
     `Latch`, `Semaphore`, `Thread(`, `threading.`, `gather(`,
     `Promise.all`, `go func`, `WaitGroup`).
@@ -295,7 +298,11 @@ rest of the previous workspace, including any older `prior/`.
   hand: write `{}`, run G5 and copy the JSON it prints. Without Python,
   count it yourself: all eight categories in this order, each with
   `total` (invariants of that category) and one count per level, zeros
-  included.
+  included. The planned first failure does not apply then. Shape:
+  `{"state": {"total": 1, "asserted": 0, "weak": 0, "contradicted": 1,
+  "uncovered": 0, "not_verifiable": 0}, "transition": {…}, …}` with the
+  categories `state, transition, logical, temporal, repetition,
+  concurrency, atomicity, algebraic`.
 
 ## `reaudit.json` — F6
 

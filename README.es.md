@@ -491,9 +491,10 @@ evals/
 
 Hay dos tipos de pruebas.
 
-**Tests deterministas**, que solo necesitan Python (y Node.js para el único
-fixture en JavaScript; sin él esos tests se omiten). El CI los ejecuta en
-cada push y en cada pull request:
+**Tests deterministas**, que solo necesitan Python: 3.9 para los tests del
+validador, 3.10 o superior para los de los fixtures (que usan sintaxis más
+nueva), y Node.js para el único fixture en JavaScript, cuyos tests se omiten
+sin él. El CI los ejecuta en cada push y en cada pull request:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -v

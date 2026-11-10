@@ -477,9 +477,10 @@ evals/
 
 There are two kinds of tests.
 
-**Deterministic tests** need only Python (and Node.js for the one
-JavaScript fixture; without it those tests are skipped). CI runs them on
-every push and pull request:
+**Deterministic tests** need only Python: 3.9 for the validator's tests,
+3.10 or newer for the fixtures' (the fixtures use newer syntax), and Node.js
+for the one JavaScript fixture, whose tests are skipped without it. CI runs
+them on every push and pull request:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -v

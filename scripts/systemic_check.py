@@ -1089,6 +1089,18 @@ def run_all(ctx):
             errors += GATES[gate](ctx)
     if status == "complete" and phase != FINAL_PHASE:
         errors.append(f"ALL run.json: status complete requires phase {FINAL_PHASE}")
+    events = {"gate_passed", "gate_failed", "returned_to", "skipped", "resumed"}
+    log = run.get("log") if isinstance(run.get("log"), list) else []
+    for i, entry in enumerate(log):
+        if not isinstance(entry, dict) or entry.get("event") not in events:
+            errors.append(f"ALL run.json.log[{i}]: event must be one of {sorted(events)}")
+            continue
+        target = entry.get("phase")
+        if entry["event"] == "returned_to" and status == "complete" and GATE_OF_PHASE.get(target):
+            redone = any(isinstance(later, dict) and later.get("phase") == target and later.get("event") == "gate_passed"
+                         for later in log[i + 1:])
+            if not redone:
+                errors.append(f"ALL run.json.log[{i}]: returned to {target}, but no later gate_passed shows it was redone")
     if status == "incomplete" and phase == FINAL_PHASE:
         errors.append(f"ALL run.json: an incomplete run keeps phase at the phase whose gate failed, not {FINAL_PHASE}")
     if status == "incomplete":

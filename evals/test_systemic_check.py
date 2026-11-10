@@ -132,6 +132,15 @@ class G0Scope(GateTestCase):
             status="incomplete", incomplete_reason="G1 fails: a target was removed and rescoping is forbidden"))
         self.assertFails("ALL", "keeps phase at the phase whose gate failed")
 
+    def test_returned_phase_must_be_redone(self):
+        self.ws.edit("run.json", lambda d: d["log"].append(
+            {"phase": "F1", "event": "returned_to", "detail": "operations.py changed since it was read"}))
+        self.assertFails("ALL", "no later gate_passed shows it was redone")
+
+    def test_log_events_are_fixed_keywords(self):
+        self.ws.edit("run.json", lambda d: d["log"].append({"phase": "F2", "event": "done", "detail": "x"}))
+        self.assertFails("ALL", "event must be one of")
+
     def test_needs_scope_requires_a_proposal(self):
         self.ws.edit("run.json", lambda d: d.update(status="needs_scope", phase="F0", scope_proposal="tbd"))
         self.assertFails("G0", "scope_proposal")

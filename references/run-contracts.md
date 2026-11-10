@@ -61,7 +61,7 @@ Conventions:
 | `status` | `in_progress`, `needs_scope`, `complete`, `incomplete` |
 | `scope_proposal` *(text)* | required when `status` is `needs_scope` **[gate]** |
 | `incomplete_reason` *(text)* | required when `status` is `incomplete` **[gate]**; an incomplete run may keep targets that no longer exist when its reason says so |
-| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped", "detail"}]`; `skipped` records F6 when there is no previous report |
+| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped"\|"resumed", "detail"}]` **[gate]**; `skipped` records F6 when there is no previous report; `returned_to` names in `phase` the phase returned to, and a complete run shows a later `gate_passed` for it **[gate]**; `resumed` records picking up an interrupted run |
 
 **Re-audit setup.** When `systemic-out/<slug>.md` already exists and is a
 systemic report of the same scope, F0 archives it before anything is

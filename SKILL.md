@@ -109,7 +109,12 @@ names one. A profile changes cost, never the evidence bar.
 1. **Context firewall.** Each phase starts by reading its input files from the
    workspace, not by recalling earlier reasoning. This keeps the run correct
    across context compaction and lets an interrupted run resume at
-   `run.json.phase`.
+   `run.json.phase`. To resume, log a `resumed` event, then run
+   `systemic_check.py all <workspace>` before anything else: a source that
+   changed since F1, or any earlier gate that no longer passes, sends the
+   run back to the earliest failing phase as rule 2 says. Redo means
+   rebuilding that phase's files from its inputs, keeping stable ids where
+   the underlying element is unchanged.
 2. **Single writer.** A phase writes only its own files and `run.json`. If a
    later phase discovers that an earlier output is wrong, go back explicitly:
    set `phase` to that phase, add a `returned_to` log entry with the reason,

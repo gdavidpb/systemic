@@ -74,6 +74,13 @@ rule, not against this case: both now say that a wrong value which is only
 displayed, which nothing decides on and which can be recomputed is
 `medium`. The table above is the run before that change.
 
+**Case 25 again, after the change.** One more run with the skill, on the
+same fixture: the drift is rated `medium`, citing the display-only clause,
+with the note that it becomes `high` if anything decides on the count;
+12 / 12 assertions, `systemic_check.py all` passes, no gate failed (203k
+tokens, 12.9 min). It also ran nothing: `execution: read_only`, where the
+first run had executed three traces before the skill said whether it could.
+
 ## Limits of this measurement
 
 - One run per cell, graded by the author of the change under test.

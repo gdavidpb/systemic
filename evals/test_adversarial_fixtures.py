@@ -315,6 +315,25 @@ class Approvals(unittest.TestCase):
             with self.assertRaises(sqlite3.IntegrityError):
                 self.conn.execute(statement)
 
+    def test_a_refused_event_lands_on_the_resubmission(self):
+        # Not planted, but real: rules 3 and 4 together let an approval issued for
+        # one submission be applied to the next one. A report may raise it.
+        self.operations.submit(self.conn, "r1")
+        self.operations.withdraw(self.conn, "r1")
+        with self.assertRaises(self.transitions.StaleRequest):
+            self.reviews.handle_review_event(self.conn, self.event())
+        self.operations.submit(self.conn, "r1")
+        self.assertEqual(self.reviews.handle_review_event(self.conn, self.event()), "applied")
+        self.assertEqual(self.operations.status_of(self.conn, "r1"), "approved")
+
+    def test_connect_cannot_reopen_a_database(self):
+        # Not planted, but real: connect() runs CREATE TABLE on every connection.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "approvals.db")
+            self.operations.connect(path).close()
+            with self.assertRaises(sqlite3.OperationalError):
+                self.operations.connect(path)
+
     def test_a_decision_and_its_count_are_one_transaction(self):
         # Defended: if the count cannot be written, the decision is rolled back.
         self.operations.submit(self.conn, "r1")
@@ -384,6 +403,17 @@ const out = {};
   store.save = save;
   out.outage = { completed: stats.completed, status: (await store.get(job.id)).status };
 
+  // Not planted, but real: every write is unconditional, so the reaper can undo a completion
+  // that lands between its read and its write.
+  store = new Store();
+  stats = { completed: 0 };
+  await q.enqueue(store, 'a', {});
+  job = await q.lease(store, 'w1', T0);
+  const stale = await store.findExpired(T0 + q.LEASE_MS);
+  await q.complete(store, stats, job.id, 'w1', T0 + q.LEASE_MS - 1);
+  await store.save({ ...stale[0], status: 'queued', leasedBy: null, leaseUntil: null });
+  out.reaperRace = (await store.get(job.id)).status;
+
   // Defended: keys are unique in the store, and an expired or reaped lease cannot act.
   store = new Store();
   const a = await q.enqueue(store, 'k', {});
@@ -429,6 +459,12 @@ class JobLeases(unittest.TestCase):
 
     def test_a_failed_save_still_counts_the_job(self):
         self.assertEqual(self.out["outage"], {"completed": 1, "status": "leased"})
+
+    def test_a_stale_reaper_write_undoes_a_completion(self):
+        self.assertEqual(self.out["reaperRace"], "queued")
+        worker = (FIXTURES / "job-leases" / "worker.js").read_text(encoding="utf-8")
+        self.assertNotIn("reap", worker)
+        self.assertNotIn("renew", worker)
 
     def test_the_defended_paths_hold(self):
         self.assertEqual(self.out["defended"],

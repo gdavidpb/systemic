@@ -149,8 +149,10 @@ encoding unmodeled semantics, "temporary" parameters, comments saying "this
 does not support X". State the limit positively: "the system cannot represent
 Y because component Z is missing" (evens + addition cannot make 7 without an
 odd number).
-**Severity**: medium by default (structural debt); high if the business is
-already asking for the unrepresentable figure.
+**Severity**: medium by default (structural debt), also when the business is
+already asking for the unrepresentable figure — a pending request raises
+priority, not damage. High only when the hack produces incorrect behavior
+users can observe today (a wrong price, a refused valid order).
 
 ## 12. Feedback loops
 

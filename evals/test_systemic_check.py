@@ -127,6 +127,11 @@ class G0Scope(GateTestCase):
         code, out = self.ws.check("all")
         self.assertEqual(code, 0, out)
 
+    def test_incomplete_run_keeps_the_failing_phase(self):
+        self.ws.edit("run.json", lambda d: d.update(
+            status="incomplete", incomplete_reason="G1 fails: a target was removed and rescoping is forbidden"))
+        self.assertFails("ALL", "keeps phase at the phase whose gate failed")
+
     def test_needs_scope_requires_a_proposal(self):
         self.ws.edit("run.json", lambda d: d.update(status="needs_scope", phase="F0", scope_proposal="tbd"))
         self.assertFails("G0", "scope_proposal")

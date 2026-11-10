@@ -1089,6 +1089,8 @@ def run_all(ctx):
             errors += GATES[gate](ctx)
     if status == "complete" and phase != FINAL_PHASE:
         errors.append(f"ALL run.json: status complete requires phase {FINAL_PHASE}")
+    if status == "incomplete" and phase == FINAL_PHASE:
+        errors.append(f"ALL run.json: an incomplete run keeps phase at the phase whose gate failed, not {FINAL_PHASE}")
     if status == "incomplete":
         report = run.get("report_path")
         if not isinstance(report, str) or not (ctx.root / report).is_file():

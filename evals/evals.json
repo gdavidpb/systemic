@@ -555,7 +555,7 @@
       "assertions": [
         "PRIMARY: resumes the existing run from run.json (phase F5, in_progress) instead of starting a new run: same slug, same workspace, mode full, no new scope question.",
         "Detects that operations.py no longer matches the hash recorded in sources.json (the validator reports it) and does not reuse the stale records.",
-        "Returns to F1 explicitly: run.json.log has a returned_to entry for F1 whose detail says operations.py changed since it was read, and F1 through F8 are redone; no earlier file is patched silently.",
+        "Returns to F1 explicitly: run.json.log has a returned_to entry for F1 whose detail says operations.py changed since it was read; the stale later files are deleted and F1 through F8 are redone; no earlier file is patched silently.",
         "Reports on the current code: no finding claims that a shipped order can be canceled; cancel's new guard is credited (as a defined/guarded matrix cell or as refuting evidence), while the other operators' missing guards, the refund closure and the webhook idempotency findings remain.",
         "Treats this as the same run, not a re-audit: prior_report stays null and there is no prior/ directory.",
         "Writes tests.json and the report, and the report has the invariant coverage table.",
@@ -589,16 +589,16 @@
       "id": 23,
       "name": "incomplete-run-discloses-why",
       "prompt": "Finish the systemic run in systemic-out/orders-module/ exactly as it was scoped. Do not change its scope or targets.",
-      "expected_output": "Setup copies evals/fixtures/resume/ into the working directory and then deletes orders/webhook.py. The run's targets name a file that no longer exists and the user forbids changing the scope, so G0 cannot pass. After at most two corrections the skill stops with status incomplete, writes a report whose first section names the gate and the missing file, and tells the user how to unblock it.",
+      "expected_output": "Setup copies evals/fixtures/resume/ into the working directory and then deletes orders/webhook.py. The run's targets name a file that no longer exists and the user forbids changing the scope, so G0 and G1 cannot pass. Every fix would break the user's constraint, so the skill stops at once with status incomplete, writes a report whose first section names the gate and the missing file, and tells the user how to unblock it.",
       "files": [
         "evals/fixtures/resume/README.md",
         "evals/fixtures/resume/orders/operations.py",
         "evals/fixtures/resume/systemic-out/orders-module/run.json"
       ],
       "assertions": [
-        "PRIMARY: run.json ends with status incomplete and an incomplete_reason naming G0 (or the re-run of F1) and the missing webhook.py.",
+        "PRIMARY: run.json ends with status incomplete, phase kept at the phase whose gate failed (F1 or F0, not F8), and an incomplete_reason naming that gate (G1 and/or G0) and the missing webhook.py.",
         "Respects the user's constraint: does not drop webhook.py from targets, does not rescope and does not start a fresh run.",
-        "Makes at most two corrections of the failing gate before stopping, and logs each gate result in run.json.log.",
+        "Stops without forbidden corrections: the only fixes (excluding webhook.py or dropping it from targets) break the user's constraint, so it stops at once rather than spending corrections; every gate result is logged in run.json.log.",
         "Still writes the report at report_path, and its first section states that the run is incomplete, why, and what would unblock it (restore webhook.py or allow the scope to change).",
         "The chat reply leads with what is missing and how to unblock it, not with findings.",
         "Does not present findings from the stale records as current results.",

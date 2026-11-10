@@ -57,7 +57,7 @@ Conventions:
 | `source_ref` | `{"commit": <sha or null>, "dirty": <bool or null>}` |
 | `validation` | `script` when the validator ran; `manual` when it could not |
 | `graph_informed` | `true` when `graphify-out/graph.json` informed the scope; omitted or `false` otherwise |
-| `phase` | the phase in progress, `F0`…`F8` |
+| `phase` | the phase in progress, `F0`…`F8`; an incomplete run keeps the phase whose gate failed **[gate]** |
 | `status` | `in_progress`, `needs_scope`, `complete`, `incomplete` |
 | `scope_proposal` *(text)* | required when `status` is `needs_scope` **[gate]** |
 | `incomplete_reason` *(text)* | required when `status` is `incomplete` **[gate]**; an incomplete run may keep targets that no longer exist when its reason says so |

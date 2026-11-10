@@ -113,14 +113,17 @@ names one. A profile changes cost, never the evidence bar.
 2. **Single writer.** A phase writes only its own files and `run.json`. If a
    later phase discovers that an earlier output is wrong, go back explicitly:
    set `phase` to that phase, add a `returned_to` log entry with the reason,
-   and redo it and everything after it. Never patch an earlier file silently.
+   delete the files of every later phase (they are stale), and redo it and
+   everything after it. Never patch an earlier file silently.
 3. **Gates.** After writing a phase's files, run
    `python3 <skill-dir>/scripts/systemic_check.py <gate> <workspace>`. Fix
    the reported violations inside the same phase and run it again, at most
-   two corrections. If it still fails, stop: set `status: incomplete` with
-   `incomplete_reason` naming the gate and the unresolved violations, write
-   the report with that reason in its first section, and go to F8. Log every
-   gate result in `run.json.log`.
+   two corrections. If it still fails — or at once, when every fix would
+   break a constraint the user set (a scope they forbade changing, a file
+   they excluded) — stop: set `status: incomplete` with `incomplete_reason`
+   naming the gate and the unresolved violations, keep `phase` at the phase
+   whose gate failed, write the report with that reason in its first
+   section, and close as F8 says. Log every gate result in `run.json.log`.
 4. **No Python.** If `python3` is not available, apply each gate as a
    checklist against `references/run-contracts.md`, set
    `validation: "manual"`, and state in the report's scope section that the
@@ -453,9 +456,10 @@ Render the selected mode from the records, not from memory.
 
 ## F8 — Close
 
-- Set `phase: F8` and `status: complete` (or `incomplete` with its reason),
-  then run `systemic_check.py all <workspace>`. If it fails, fix the
-  reported phase as the run protocol says.
+- For a finished run, set `phase: F8` and `status: complete`. An incomplete
+  run keeps the phase that failed. Then run `systemic_check.py all
+  <workspace>`: it checks every phase before the current one. If it fails on
+  a complete run, fix the reported phase as the run protocol says.
 - In chat, reply with the report path, the executive summary and the single
   most serious finding, plus the most serious test gap when there is one (an
   enshrined finding first, then an important category with nothing

@@ -76,7 +76,7 @@ class GateTestCase(unittest.TestCase):
 
 class GoldenRun(GateTestCase):
     def test_golden_run_passes_every_gate(self):
-        for gate in ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "all"]:
+        for gate in ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "all"]:
             code, out = self.ws.check(gate)
             self.assertEqual(code, 0, f"{gate}: {out}")
             self.assertIn(f"OK {gate}", out)
@@ -154,6 +154,85 @@ class G2Model(GateTestCase):
         self.ws.edit("model.json", lambda d: d.update(claims_satisfied=[]))
         self.assertFails("G2", "claim D-7 is neither satisfied")
 
+    def test_invariant_category_is_a_fixed_keyword(self):
+        self.ws.edit("model.json", lambda d: d["invariants"][0].update(category="safety"))
+        self.assertFails("G2", "category: must be one of")
+
+    def test_every_machine_has_an_invariant(self):
+        def unbind(d):
+            for inv in d["invariants"]:
+                inv["machine"] = None
+        self.ws.edit("model.json", unbind)
+        self.assertFails("G2", "machine M-1 has no invariant")
+
+    def test_declared_invariant_names_its_claims(self):
+        self.ws.edit("model.json", lambda d: d["invariants"][1].update(claims=[]))
+        self.assertFails("G2", "names the claims that declare it")
+
+
+class G5Tests(GateTestCase):
+    def coverage(self, data, invariant):
+        return next(c for c in data["coverage"] if c["invariant"] == invariant)
+
+    def test_every_invariant_has_a_coverage_entry(self):
+        self.ws.edit("tests.json", lambda d: d["coverage"].pop())
+        self.assertFails("G5", "invariant I-8 has no coverage entry")
+
+    def test_asserted_needs_an_assertion_in_a_test_file(self):
+        def cite_source(d):
+            self.coverage(d, "I-3")["evidence"] = [
+                {"file": "operations.py", "line": 52, "quote": 'if order.status != "shipped":'}]
+        self.ws.edit("tests.json", cite_source)
+        self.assertFails("G5", "is not recorded with role test")
+
+    def test_asserted_without_evidence(self):
+        self.ws.edit("tests.json", lambda d: self.coverage(d, "I-3").update(evidence=[]))
+        self.assertFails("G5", "at least 1 citation")
+
+    def test_single_delivery_cannot_assert_idempotency(self):
+        def promote(d):
+            self.coverage(d, "I-6").update(
+                level="asserted",
+                evidence=[{"file": "test_orders.py", "line": 70, "quote": "self.assertEqual(order.total_paid, 20.0)"}])
+        self.ws.edit("tests.json", promote)
+        self.assertFails("G5", "a repetition invariant is asserted only by")
+
+    def test_contradicted_names_the_finding_it_enshrines(self):
+        self.ws.edit("tests.json", lambda d: self.coverage(d, "I-1").update(finding="operations.py:nope:x:y"))
+        self.assertFails("G5", "is not a confirmed fingerprint")
+
+    def test_uncovered_says_what_was_searched(self):
+        self.ws.edit("tests.json", lambda d: self.coverage(d, "I-5").update(reason="none"))
+        self.assertFails("G5", "coverage[4].reason")
+
+    def test_hole_cells_are_not_tested_cells(self):
+        self.ws.edit("tests.json", lambda d: d["cells_tested"].append(
+            {"machine": "M-1", "cell": "shipped/O-5", "tests": ["X-2"]}))
+        self.assertFails("G5", "is a hole")
+
+    def test_every_finding_is_classified_against_the_suite(self):
+        self.ws.edit("tests.json", lambda d: d["finding_gaps"].pop())
+        self.assertFails("G5", "is not classified")
+
+    def test_enshrined_needs_the_test_that_asserts_the_defect(self):
+        self.ws.edit("tests.json", lambda d: d["finding_gaps"][0].update(tests=[]))
+        self.assertFails("G5", "at least 1 test(s) required")
+
+    def test_by_category_is_recomputed(self):
+        self.ws.edit("tests.json", lambda d: d["by_category"]["transition"].update(asserted=2))
+        self.assertFails("G5", "by_category: must be")
+
+    def test_absent_suite_cannot_assert(self):
+        def absent(d):
+            d["suite"] = {"status": "absent", "files": [], "searched": "test_*.py and tests/ under the module root",
+                          "reason": None}
+        self.ws.edit("tests.json", absent)
+        self.assertFails("G5", "with no test suite every invariant is uncovered")
+
+    def test_test_ids_are_unique(self):
+        self.ws.edit("tests.json", lambda d: d["tests"][1].update(id="X-1"))
+        self.assertFails("G5", "must be a unique X-<n>")
+
 
 class G3Checks(GateTestCase):
     def test_all_twelve_checks_are_recorded(self):
@@ -222,7 +301,7 @@ class G4Findings(GateTestCase):
         self.assertFails("G4", ".label")
 
 
-class G5Reaudit(GateTestCase):
+class G6Reaudit(GateTestCase):
     def seed_prior(self):
         prior = self.ws.run_dir / "prior"
         prior.mkdir()
@@ -256,70 +335,89 @@ class G5Reaudit(GateTestCase):
     def test_prior_finding_left_unclassified(self):
         self.seed_prior()
         self.ws.edit("reaudit.json", lambda d: d["prior_findings"].pop())
-        self.assertFails("G5", "keys must be the previous fingerprints")
+        self.assertFails("G6", "keys must be the previous fingerprints")
 
     def test_resolved_needs_evidence_of_the_fix(self):
         self.seed_prior()
         self.ws.edit("reaudit.json", lambda d: d["prior_findings"][1].update(evidence=[]))
-        self.assertFails("G5", "at least 1 citation")
+        self.assertFails("G6", "at least 1 citation")
 
     def test_counts_must_match(self):
         self.seed_prior()
         self.ws.edit("reaudit.json", lambda d: d["counts"].update(resolved=0))
-        self.assertFails("G5", "counts")
+        self.assertFails("G6", "counts")
 
     def test_report_states_the_reaudit_counts(self):
         self.seed_prior()
         self.ws.report.write_text(self.ws.report.read_text().replace("resolved: 1", "resolved: 2"))
-        self.assertFails("G6", "resolved: 2")
+        self.assertFails("G7", "resolved: 2")
 
     def test_legacy_markdown_prior_counts_its_findings(self):
         self.seed_prior()
         (self.ws.run_dir / "prior" / "findings.json").unlink()
         self.ws.edit("run.json", lambda d: d["prior_report"].update(format="md-legacy"))
         self.ws.edit("reaudit.json", lambda d: d["prior_findings"].pop())
-        self.assertFails("G5", "previous report has 2 findings, 1 classified")
+        self.assertFails("G6", "previous report has 2 findings, 1 classified")
 
 
-class G6Report(GateTestCase):
+class G7Report(GateTestCase):
     def test_summary_counts_match_the_records(self):
         self.ws.report.write_text(self.ws.report.read_text().replace("high: 6", "high: 5"))
-        self.assertFails("G6", "high: 5")
+        self.assertFails("G7", "high: 5")
 
     def test_every_confirmed_finding_is_reported(self):
         text = self.ws.report.read_text()
         start = text.index("### [high] [INCONSISTENCY] Paused orders can never resume")
         end = text.index("### ", start + 4)
         self.ws.report.write_text(text[:start] + text[end:])
-        self.assertFails("G6", "Paused orders can never resume")
+        self.assertFails("G7", "Paused orders can never resume")
 
     def test_severity_in_report_matches_the_record(self):
         self.ws.report.write_text(self.ws.report.read_text().replace(
             "### [high] [INCONSISTENCY] Paused orders", "### [low] [INCONSISTENCY] Paused orders"))
-        self.assertFails("G6", "is shown as")
+        self.assertFails("G7", "is shown as")
 
     def test_full_mode_needs_the_coverage_table(self):
         text = self.ws.report.read_text()
         self.ws.report.write_text(text[:text.index("## Limits and not-verified")])
-        self.assertFails("G6", "coverage table")
+        self.assertFails("G7", "coverage table")
 
     def test_functional_mode_hides_methodology(self):
         self.ws.edit("run.json", lambda d: d.update(mode="functional", mode_source="default"))
-        code, out = self.ws.check("G6")
+        code, out = self.ws.check("G7")
         self.assertEqual(code, 1)
         self.assertIn("mermaid", out)
         self.assertIn("check numbers", out)
         self.assertIn("twelve-check coverage table", out)
 
+    def test_invariant_coverage_table_matches_the_records(self):
+        self.ws.report.write_text(self.ws.report.read_text().replace(
+            "| transition | 2 | 1 | 1 |", "| transition | 2 | 2 | 0 |"))
+        self.assertFails("G7", "invariant coverage for transition reads")
+
+    def test_invariant_coverage_table_has_every_category(self):
+        self.ws.report.write_text(self.ws.report.read_text().replace("| algebraic | 1 | 0 | 0 | 0 | 1 | 0 |\n", ""))
+        self.assertFails("G7", "needs a row for algebraic")
+
+    def test_full_mode_states_matrix_cells_tested(self):
+        self.ws.report.write_text(self.ws.report.read_text().replace("M-1 cells tested: 4/19", "M-1 cells tested: 9/19"))
+        self.assertFails("G7", "M-1 cells tested reads 9/19")
+
+    def test_functional_mode_keeps_the_invariant_table(self):
+        self.ws.edit("run.json", lambda d: d.update(mode="functional", mode_source="default"))
+        code, out = self.ws.check("G7")
+        self.assertNotIn("invariant coverage", out)
+        self.assertNotIn("cells tested", out)
+
     def test_no_html(self):
         self.ws.report.write_text(self.ws.report.read_text() + "\n<div>summary</div>\n")
-        self.assertFails("G6", "HTML")
+        self.assertFails("G7", "HTML")
 
 
 class RunState(GateTestCase):
     def test_complete_requires_the_final_phase(self):
-        self.ws.edit("run.json", lambda d: d.update(phase="F6"))
-        self.assertFails("ALL", "requires phase F7")
+        self.ws.edit("run.json", lambda d: d.update(phase="F7"))
+        self.assertFails("ALL", "requires phase F8")
 
     def test_in_progress_run_only_checks_finished_phases(self):
         self.ws.edit("run.json", lambda d: d.update(status="in_progress", phase="F3"))

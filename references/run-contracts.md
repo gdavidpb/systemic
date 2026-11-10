@@ -4,16 +4,17 @@ A run keeps its state in a workspace next to the report:
 
 ```
 systemic-out/
-├── <slug>.md           the report (F6)
+├── <slug>.md           the report (F7)
 └── <slug>/             the run workspace
     ├── run.json        F0, updated by every phase
     ├── sources.json    F1
     ├── model.json      F2
     ├── checks.json     F3
     ├── findings.json   F4
-    ├── reaudit.json    F5, only when a previous report exists
+    ├── tests.json      F5
+    ├── reaudit.json    F6, only when a previous report exists
     ├── prior/          F0, only on a re-audit: report.md (+ findings.json)
-    └── 00-scope.md … 05-reaudit.md   phase logs (profile standard)
+    └── 00-scope.md … 06-reaudit.md   phase logs (profile standard)
         or work.md                    single log (profile quick)
 ```
 
@@ -26,7 +27,7 @@ Conventions:
 
 - **IDs** are stable within a run: `D-n` declared claim, `S-n` system,
   `E-n` element, `O-n` operator, `M-n` machine, `T-n` transition,
-  `V-n` divergence, `C-n` candidate.
+  `V-n` divergence, `I-n` invariant, `C-n` candidate, `X-n` test.
 - **Citation**: `{"file": "<path>", "line": <n>, "quote": "<text>"}`.
   `file` is exactly a `path` recorded in `sources.json` (relative to
   `source_root`). `quote` is copied from the file and must appear within
@@ -42,23 +43,23 @@ Conventions:
 
 | Field | Value |
 |---|---|
-| `schema` | `"systemic.run/1"` |
+| `schema` | `"systemic.run/2"` |
 | `slug` | kebab-case scope name; the report is `systemic-out/<slug>.md` **[gate]** |
 | `scope` *(text)* | what is analyzed, in one sentence |
 | `mode`, `mode_source` | `functional`\|`full`; `explicit`\|`default`. `full` requires `explicit` **[gate]** |
 | `language`, `language_source` | e.g. `"es"`; `explicit`\|`conversation` |
 | `profile`, `profile_source` | `quick`\|`standard`; `explicit`\|`auto` |
 | `source_root` | directory the citations are relative to; absolute, or relative to the project root |
-| `targets` | files or directories under `source_root`; each must exist **[gate]** |
+| `targets` | files or directories under `source_root`, including the test files of the scope; each must exist **[gate]** |
 | `report_path`, `report_path_source` | relative to the project root, no `..`, never inside `node_modules`, `vendor`, `.git`, `fixtures`, a virtualenv **[gate]**; `default`\|`user` |
 | `prior_report` | `null`, or `{"path", "format": "json"\|"md-legacy"}`; see Re-audit below |
 | `source_ref` | `{"commit": <sha or null>, "dirty": <bool or null>}` |
 | `validation` | `script` when the validator ran; `manual` when it could not |
-| `phase` | the phase in progress, `F0`…`F7` |
+| `phase` | the phase in progress, `F0`…`F8` |
 | `status` | `in_progress`, `needs_scope`, `complete`, `incomplete` |
 | `scope_proposal` *(text)* | required when `status` is `needs_scope` **[gate]** |
 | `incomplete_reason` *(text)* | required when `status` is `incomplete` **[gate]** |
-| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped", "detail"}]`; `skipped` records F5 when there is no previous report |
+| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped", "detail"}]`; `skipped` records F6 when there is no previous report |
 
 **Re-audit setup.** When `systemic-out/<slug>.md` already exists and is a
 systemic report of the same scope, F0 archives it before anything is
@@ -71,7 +72,8 @@ rest of the previous workspace, including any older `prior/`.
 
 ```json
 {
-  "files":   [{"path": "operations.py", "sha256": "…", "lines": 55, "read": "full"}],
+  "files":   [{"path": "operations.py", "sha256": "…", "lines": 55, "read": "full"},
+              {"path": "tests/test_orders.py", "sha256": "…", "lines": 70, "read": "full", "role": "test"}],
   "excluded": [{"path": "legacy/", "reason": "generated client, no state"}],
   "claims":  [{"id": "D-2", "text": "Only draft or pending_payment orders can be canceled",
                "file": "README.md", "line": 11}]
@@ -86,6 +88,10 @@ rest of the previous workspace, including any older `prior/`.
 - Every target is read or excluded with a reason **[gate]**.
 - `claims` are the *silhouette*: what README, docstrings, specs, comments
   and declared constants promise.
+- `role` is `source` (the default) or `test` **[gate]**. Test files are read
+  in F1 like any other file; F5 cites only files recorded with `role: test`
+  as evidence that a test asserts something. A test's assertions are not
+  claims: what the suite asserts is audited in F5, not promised in F1.
 
 ## `model.json` — F2
 
@@ -102,7 +108,11 @@ rest of the previous workspace, including any older `prior/`.
                  "transitions": [{"id": "T-5", "from": "*", "to": "refund_pending",
                                   "operator": "O-7", "evidence": [cite]}]}],
   "divergences": [{"id": "V-1", "claims": ["D-2"], "description": "…", "evidence": [cite]}],
-  "claims_satisfied": ["D-7"]
+  "claims_satisfied": ["D-7"],
+  "invariants": [{"id": "I-6", "category": "repetition",
+                  "statement": "Redelivering a payment event leaves total_paid unchanged",
+                  "machine": null, "operators": ["O-10"], "source": "declared",
+                  "claims": ["D-6"], "evidence": [cite]}]
 }
 ```
 
@@ -113,6 +123,14 @@ rest of the previous workspace, including any older `prior/`.
 - Every transition names a modeled operator and states of its machine **[gate]**.
 - An `implicit` machine (co-varying flags and nullable fields) lists `fields` **[gate]**.
 - Every claim is either in `claims_satisfied` or linked to a divergence **[gate]**.
+- `invariants` is the catalog of `references/invariants.md`. Each has a
+  unique `I-n`, a `category` among `state`, `transition`, `logical`,
+  `temporal`, `repetition`, `concurrency`, `atomicity`, `algebraic`, a
+  `statement` *(text)* and at least one citation; `machine` and `operators`
+  are modeled ids **[gate]**.
+- `source` is `declared` (it names the claims `D-n` that declare it) or
+  `inferred` from the model **[gate]**.
+- Every machine is referenced by at least one invariant **[gate]**.
 
 ## `checks.json` — F3
 
@@ -147,6 +165,8 @@ rest of the previous workspace, including any older `prior/`.
   - `hole`: the operator proceeds without considering this state, including
     a write the declared rules forbid.
   Every `hole` has a note naming a candidate or explaining it **[gate]**.
+- `refs` names the model ids a candidate rests on: transitions `T-n`, and
+  the invariants `I-n` it breaks, so F5 can ask whether a test would catch it.
 - Candidates are hypotheses. They become findings only in F4.
 
 ## `findings.json` — F4
@@ -186,7 +206,66 @@ rest of the previous workspace, including any older `prior/`.
   `high`, `medium`, `low`; confidence `high`, `medium`, `low` **[gate]**.
 - `title` is the exact heading text used in the report.
 
-## `reaudit.json` — F5
+## `tests.json` — F5
+
+```json
+{
+  "suite": {"status": "in_scope", "files": ["tests/test_orders.py"],
+            "searched": "test_*.py and tests/ under the module root", "reason": null},
+  "tests": [{"id": "X-6", "name": "test_full_payment_marks_the_order_paid",
+             "technique": "example", "operators": ["O-10"], "evidence": [cite]}],
+  "coverage": [
+    {"invariant": "I-3", "level": "asserted", "tests": ["X-4"], "evidence": [cite],
+     "reason": null, "finding": null},
+    {"invariant": "I-6", "level": "weak", "tests": ["X-6"], "evidence": [],
+     "reason": "each event is delivered once", "finding": null},
+    {"invariant": "I-1", "level": "contradicted", "tests": ["X-5"], "evidence": [cite],
+     "reason": "…", "finding": "operations.py:refund:closure:undeclared-state"}
+  ],
+  "cells_tested": [{"machine": "M-1", "cell": "pending_payment/O-9", "tests": ["X-4"]}],
+  "finding_gaps": [
+    {"finding": "operations.py:refund:closure:undeclared-state", "status": "enshrined",
+     "tests": ["X-5"], "evidence": [cite], "note": "…"},
+    {"finding": "webhook.py:handle_payment_webhook:idempotency:no-dedup",
+     "status": "undetected", "tests": [], "evidence": [], "note": "…"}
+  ],
+  "by_category": {"state": {"total": 1, "asserted": 0, "weak": 0, "contradicted": 1,
+                            "uncovered": 0, "not_verifiable": 0}, "…": {}}
+}
+```
+
+- `suite.status` **[gate]**:
+  - `in_scope`: `files` are recorded in `sources.json` with `role: test`, and
+    `tests` lists at least one test.
+  - `absent`: `searched` *(text)* says where tests were looked for; no file
+    has `role: test`; every invariant is `uncovered` and every finding
+    `undetected`.
+  - `out_of_scope`: `reason` *(text)*; every invariant is `not_verifiable`.
+- `tests`: unique `X-n`, a `name`, a `technique` among `example`,
+  `sequence`, `property`, `stateful`, `repetition`, `concurrency`,
+  `fault_injection`, `metamorphic`, modeled `operators`, and a quoted
+  citation in a `role: test` file **[gate]**.
+- `coverage`: exactly one entry per invariant **[gate]**, with a `level`:
+  - `asserted`: at least one test and a quoted citation of the assertion in a
+    `role: test` file **[gate]**. For `temporal`, `repetition`,
+    `concurrency`, `atomicity` and `algebraic`, at least one of those tests
+    uses a technique that can catch the category (the table in
+    `references/invariants.md`); otherwise the level is `weak` **[gate]**.
+  - `weak`: at least one test and `reason` *(text)* **[gate]**.
+  - `contradicted`: at least one test, a quoted citation of the assertion,
+    and either `finding` (a confirmed fingerprint) or `reason` *(text)*
+    **[gate]**.
+  - `uncovered`, `not_verifiable`: `reason` *(text)* **[gate]**.
+- `cells_tested`: cells of a matrix in `checks.json` that are `defined` or
+  `guarded`, never a `hole`, each with at least one test **[gate]**.
+- `finding_gaps`: every confirmed finding exactly once, `detected`,
+  `undetected` or `enshrined`; `detected` and `enshrined` need tests and a
+  quoted citation **[gate]**.
+- `by_category` has the eight categories and equals the count the validator
+  recomputes from `invariants` and `coverage` **[gate]**. Never write it by
+  hand; copy what the validator reports.
+
+## `reaudit.json` — F6
 
 ```json
 {
@@ -218,7 +297,7 @@ rest of the previous workspace, including any older `prior/`.
   It is not counted in the current severity totals.
 - `counts` match the entries **[gate]**.
 
-## The report — F6
+## The report — F7
 
 The validator reads the rendered Markdown and checks it against the records:
 
@@ -233,6 +312,15 @@ The validator reads the rendered Markdown and checks it against the records:
   `checks.json` **[gate]**.
 - `functional`: no mermaid block, no `**Check**` lines, no twelve-check
   table **[gate]**.
+- Both modes: an invariant coverage table with one row per category,
+  `| state | total | asserted | weak | contradicted | uncovered | not verifiable |`,
+  whose numbers equal `tests.json.by_category` **[gate]**. Category names and
+  levels are fixed keywords, not translated; the header row is translated.
+- `full`: for every machine with a matrix, the line
+  `<machine id> cells tested: N/M`, where M counts the `defined` and
+  `guarded` cells and N those in `cells_tested` **[gate]**.
+- Coverage gaps never add a `### [severity] [LABEL]` heading and never change
+  the count line.
 - No HTML tags outside code blocks **[gate]**.
 - When `status` is `incomplete`, the report must exist and its first section
   states the reason. The finding checks are skipped.
@@ -240,7 +328,7 @@ The validator reads the rendered Markdown and checks it against the records:
 ## Running the validator
 
 ```sh
-python3 <skill-dir>/scripts/systemic_check.py G3 systemic-out/<slug>
+python3 <skill-dir>/scripts/systemic_check.py G5 systemic-out/<slug>
 python3 <skill-dir>/scripts/systemic_check.py all systemic-out/<slug>
 ```
 

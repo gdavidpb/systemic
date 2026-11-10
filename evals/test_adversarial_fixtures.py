@@ -173,5 +173,46 @@ class AdversarialFixtures(unittest.TestCase):
                 self.assertEqual(len(enqueued), expected_retries)
 
 
+class FixtureSuites(unittest.TestCase):
+    """The test suites planted in fixtures, which the test-audit phase reads."""
+
+    def run_suite(self, name, module):
+        (suite,) = fixture(name, module)
+        result = unittest.TestResult()
+        unittest.defaultTestLoader.loadTestsFromModule(suite).run(result)
+        return result
+
+    def test_orders_suite_is_green_on_defective_code(self):
+        # A green suite is not a correct system: one test asserts the closure
+        # defect, and none exercises the others.
+        result = self.run_suite("orders", "test_orders")
+        self.assertTrue(result.wasSuccessful(), result.failures + result.errors)
+        self.assertEqual(result.testsRun, 6)
+
+    def test_orders_suite_enshrines_refund_pending(self):
+        models, operations = fixture("orders", "models", "operations")
+        order = models.Order("o-1")
+        operations.refund(order)
+        self.assertNotIn(order.status, models.STATUS)
+        source = (FIXTURES / "orders" / "test_orders.py").read_text(encoding="utf-8")
+        self.assertIn('self.assertEqual(order.status, "refund_pending")', source)
+
+    def test_orders_suite_never_redelivers_a_webhook(self):
+        models, operations, webhook = fixture("orders", "models", "operations", "webhook")
+        order = models.Order("o-1")
+        operations.add_item(order, models.Item("SKU-1", 2, 10.0))
+        operations.checkout(order)
+        event = {"id": "evt-1", "amount": 20.0}
+        webhook.handle_payment_webhook(order, event)
+        webhook.handle_payment_webhook(order, event)
+        self.assertEqual(order.total_paid, 40.0)
+        source = (FIXTURES / "orders" / "test_orders.py").read_text(encoding="utf-8")
+        self.assertEqual(source.count("handle_payment_webhook(order"), 1)
+
+    def test_clean_ticket_suite_is_green(self):
+        result = self.run_suite("clean-ticket", "test_tickets")
+        self.assertTrue(result.wasSuccessful(), result.failures + result.errors)
+
+
 if __name__ == "__main__":
     unittest.main()

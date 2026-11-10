@@ -1,6 +1,6 @@
 {
   "skill_name": "systemic",
-  "notes": "Evals 1, 2, 4, 5, 6, 7, 9 and 10 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1; 5 targets partial failure and loops; 6 is the clean false-positive control; 7 distinguishes actual defenses from independent refund and failed-payment recovery defects; 9 tests an unverified re-audit antecedent; 10 tests independent root causes, historical snapshots and impact-based severity). Evals 8 and 9 need setup: copy their previous-orders-module.md to <working-dir>/systemic-out/orders-module.md BEFORE the run. Substitute the absolute skill path for <SKILL_DIR>. Eval 3 is a template requiring a real target supplied at runtime. Reports go under systemic-out/ in the working directory, outside the fixture directories. Isolate runs to prevent stale reports; for re-audits seed the correct previous report. No expected finding count forbids additional evidence-backed defects. Assertions evaluate causal evidence and impact, not agreement with a preferred phrasing. Output selection is tested separately: cases 1-10 explicitly request full to preserve their detailed-format assertions; 11 uses no mode and must default to functional; 12 explicitly requests full on the same invoice fixture; 13 reauds an older full report in default functional mode. Case 13 requires the same previous-report setup as 9. Both modes keep evidence, labels, confidence, impact limits and finding history; only presentation differs. Since the gated process, every run also writes its workspace at systemic-out/<slug>/ (run.json, sources.json, model.json, checks.json, findings.json, reaudit.json on re-audits, plus phase logs or work.md); the report path is unchanged. Every case therefore carries a workspace assertion graded with scripts/systemic_check.py all <workspace>. Eval 14 needs setup: copy evals/fixtures/rerun-json/orders-module.md to <working-dir>/systemic-out/orders-module.md and evals/fixtures/rerun-json/orders-module/ to <working-dir>/systemic-out/orders-module/ BEFORE the run. The validator itself is tested deterministically by evals/test_systemic_check.py against the golden workspace in evals/fixtures/runs/orders-valid.",
+  "notes": "Evals 1, 2, 4, 5, 6, 7, 9 and 10 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1; 5 targets partial failure and loops; 6 is the clean false-positive control; 7 distinguishes actual defenses from independent refund and failed-payment recovery defects; 9 tests an unverified re-audit antecedent; 10 tests independent root causes, historical snapshots and impact-based severity). Evals 8 and 9 need setup: copy their previous-orders-module.md to <working-dir>/systemic-out/orders-module.md BEFORE the run. Substitute the absolute skill path for <SKILL_DIR>. Eval 3 is a template requiring a real target supplied at runtime. Reports go under systemic-out/ in the working directory, outside the fixture directories. Isolate runs to prevent stale reports; for re-audits seed the correct previous report. No expected finding count forbids additional evidence-backed defects. Assertions evaluate causal evidence and impact, not agreement with a preferred phrasing. Output selection is tested separately: cases 1-10 explicitly request full to preserve their detailed-format assertions; 11 uses no mode and must default to functional; 12 explicitly requests full on the same invoice fixture; 13 reauds an older full report in default functional mode. Case 13 requires the same previous-report setup as 9. Both modes keep evidence, labels, confidence, impact limits and finding history; only presentation differs. Since the gated process, every run also writes its workspace at systemic-out/<slug>/ (run.json, sources.json, model.json, checks.json, findings.json, reaudit.json on re-audits, plus phase logs or work.md); the report path is unchanged. Every case therefore carries a workspace assertion graded with scripts/systemic_check.py all <workspace>. Eval 14 needs setup: copy evals/fixtures/rerun-json/orders-module.md to <working-dir>/systemic-out/orders-module.md and evals/fixtures/rerun-json/orders-module/ to <working-dir>/systemic-out/orders-module/ BEFORE the run. The validator itself is tested deterministically by evals/test_systemic_check.py against the golden workspace in evals/fixtures/runs/orders-valid. Evals 15 and 16 exercise the test-audit phase (F5): 15 on the orders fixture, whose green suite enshrines the refund closure defect and misses the others; 16 on the clean ticket module, whose strong suite must be credited without manufactured gaps. Every workspace now also holds tests.json; a scope with no tests records the suite as absent, so every invariant is uncovered and every finding undetected.",
   "evals": [
     {
       "id": 1,
@@ -11,7 +11,8 @@
         "evals/fixtures/orders/README.md",
         "evals/fixtures/orders/models.py",
         "evals/fixtures/orders/operations.py",
-        "evals/fixtures/orders/webhook.py"
+        "evals/fixtures/orders/webhook.py",
+        "evals/fixtures/orders/test_orders.py"
       ],
       "assertions": [
         "Detects the closure violation: refund() writes status 'refund_pending' which is not in the STATUS set (models.py vs operations.py) — rated critical or high",
@@ -98,7 +99,8 @@
         "evals/fixtures/orders/README.md",
         "evals/fixtures/orders/models.py",
         "evals/fixtures/orders/operations.py",
-        "evals/fixtures/orders/webhook.py"
+        "evals/fixtures/orders/webhook.py",
+        "evals/fixtures/orders/test_orders.py"
       ],
       "assertions": [
         "The report's section headers and prose are in English, following the explicit request rather than the language of the prompt",
@@ -152,7 +154,8 @@
       "files": [
         "evals/fixtures/clean-ticket/README.md",
         "evals/fixtures/clean-ticket/models.py",
-        "evals/fixtures/clean-ticket/operations.py"
+        "evals/fixtures/clean-ticket/operations.py",
+        "evals/fixtures/clean-ticket/test_tickets.py"
       ],
       "assertions": [
         "PRIMARY: reports ZERO critical and ZERO high findings",
@@ -216,7 +219,8 @@
         "evals/fixtures/orders/models.py",
         "evals/fixtures/orders/operations.py",
         "evals/fixtures/orders/webhook.py",
-        "evals/fixtures/rerun/previous-orders-module.md"
+        "evals/fixtures/rerun/previous-orders-module.md",
+        "evals/fixtures/orders/test_orders.py"
       ],
       "assertions": [
         "Recognizes the existing systemic-out/orders-module.md as a previous report of the same scope and says the run is a re-audit instead of silently overwriting it",
@@ -359,7 +363,8 @@
         "evals/fixtures/orders/operations.py",
         "evals/fixtures/orders/webhook.py",
         "evals/fixtures/rerun-json/orders-module.md",
-        "evals/fixtures/rerun-json/orders-module/findings.json"
+        "evals/fixtures/rerun-json/orders-module/findings.json",
+        "evals/fixtures/orders/test_orders.py"
       ],
       "assertions": [
         "Detects the previous run, archives it at systemic-out/orders-module/prior/report.md and prior/findings.json before writing anything else, and records prior_report with format json.",
@@ -368,6 +373,59 @@
         "The deliver finding is resolved, citing the guard `if order.status != \"shipped\":` in deliver() as quoted evidence.",
         "Current findings without a predecessor (at minimum the webhook idempotency flaw, the discount ambiguity and the stored-total drift) are new, and the report states new / persisting / resolved / not verified counts matching reaudit.json.",
         "Exactly one report remains at systemic-out/orders-module.md, in full structure with the twelve-row coverage table.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
+      ],
+      "output_mode": "full"
+    },
+    {
+      "id": 15,
+      "name": "test-audit-enshrined-defect",
+      "prompt": "Audit the orders module at <SKILL_DIR>/evals/fixtures/orders/ (README.md, models.py, operations.py, webhook.py and test_orders.py). Our suite is green; do our tests actually protect the order lifecycle?",
+      "expected_output": "The default functional report. Besides the code findings, it reads test_orders.py without running it and reports, per invariant category, what the suite asserts. The headline gap is that the refund test asserts the undeclared refund_pending status, so the suite passes because of the closure defect and fixing it turns a test red. A green suite is not taken as evidence of correctness.",
+      "files": [
+        "evals/fixtures/orders/README.md",
+        "evals/fixtures/orders/models.py",
+        "evals/fixtures/orders/operations.py",
+        "evals/fixtures/orders/webhook.py",
+        "evals/fixtures/orders/test_orders.py"
+      ],
+      "assertions": [
+        "PRIMARY: identifies that test_refund_moves_the_order_to_refund_pending asserts the undeclared status (test_orders.py:62) and records it as enshrining the refund closure finding, not as protection",
+        "Does not run the test suite and does not treat a green suite as evidence that any invariant holds; the report says the tests were read, not run",
+        "Rates the duplicated-webhook invariant weak, not asserted: test_full_payment_marks_the_order_paid delivers the event once, so it cannot catch a duplicate",
+        "Rates the atomic-shipping invariant weak, not asserted: test_ship_then_deliver never makes the courier fail",
+        "Rates 'a shipped order is never canceled' weak, not asserted: cancel is tested only from pending_payment",
+        "Credits the deliver guard as asserted, citing the assertRaises at test_orders.py:55",
+        "Leaves the concurrency category empty or not verifiable rather than inventing a concurrency invariant for an in-memory module",
+        "The report has the invariant coverage table with one row per category (state, transition, logical, temporal, repetition, concurrency, atomicity, algebraic), and its numbers match tests.json",
+        "Coverage gaps do not appear as extra ### [severity] [LABEL] headings and do not change the count line",
+        "The functional report explains the gaps in everyday language (for example, that no test would notice a redelivered payment counted twice) without invariant ids, technique names or matrix cells",
+        "Uses functional output because no mode was requested.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses.",
+        "tests.json records test_orders.py as an in-scope suite, one coverage entry per catalogued invariant, and a finding_gaps entry for every confirmed finding."
+      ],
+      "output_mode": "functional"
+    },
+    {
+      "id": 16,
+      "name": "test-audit-no-false-gaps",
+      "prompt": "Run a systemic analysis of the ticket module at <SKILL_DIR>/evals/fixtures/clean-ticket/ (README.md, models.py, operations.py, test_tickets.py), including how well its tests cover the lifecycle. Use output full.",
+      "expected_output": "A deliberately correct module with a strong suite. The audit credits what the tests really assert — the exhaustive state × action walk, the field rules along every action sequence, the absorbing closed state, the repeated-operation test and the reopen-undoes-resolve test — and does not invent gaps to have something to report. It still names what is genuinely untestable here (concurrency, atomicity) as empty or not verifiable rather than uncovered defects.",
+      "files": [
+        "evals/fixtures/clean-ticket/README.md",
+        "evals/fixtures/clean-ticket/models.py",
+        "evals/fixtures/clean-ticket/operations.py",
+        "evals/fixtures/clean-ticket/test_tickets.py"
+      ],
+      "assertions": [
+        "PRIMARY: reports ZERO critical and ZERO high findings, and no finding is classified as enshrined",
+        "Credits the transition invariants as asserted by test_every_state_and_action_is_a_transition_or_a_refusal, which drives every (state, action) cell and expects refusals to change nothing",
+        "Credits the assignee and resolved_at field rules as asserted by test_every_action_sequence_keeps_the_field_rules, a sequence test over every action sequence up to length five",
+        "Credits closed as a never-left final state (temporal) through test_closed_is_absorbing, and the repeated-operation rule (repetition) through test_applying_an_operation_twice_is_safe",
+        "Credits reopen undoing resolve as an asserted algebraic invariant via test_reopen_undoes_resolve",
+        "States in full mode that every defined and guarded cell of the ticket matrix is tested, with the 'cells tested: N/M' line where N equals M",
+        "Does NOT invent concurrency or atomicity invariants for an in-memory module with no multi-system write; those categories are empty or not verifiable",
+        "Does not run the test suite; the report says the tests were read, not run",
         "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"

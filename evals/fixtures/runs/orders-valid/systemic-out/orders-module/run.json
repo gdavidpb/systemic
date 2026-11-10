@@ -1,7 +1,7 @@
 {
-  "schema": "systemic.run/1",
+  "schema": "systemic.run/2",
   "slug": "orders-module",
-  "scope": "Order lifecycle of the orders module: README.md, models.py, operations.py, webhook.py",
+  "scope": "Order lifecycle of the orders module: README.md, models.py, operations.py, webhook.py and its tests",
   "mode": "full",
   "mode_source": "explicit",
   "language": "en",
@@ -13,7 +13,8 @@
     "README.md",
     "models.py",
     "operations.py",
-    "webhook.py"
+    "webhook.py",
+    "test_orders.py"
   ],
   "report_path": "systemic-out/orders-module.md",
   "report_path_source": "default",
@@ -23,7 +24,7 @@
     "dirty": null
   },
   "validation": "script",
-  "phase": "F7",
+  "phase": "F8",
   "status": "complete",
   "incomplete_reason": null,
   "log": [
@@ -53,9 +54,19 @@
       "detail": "G4"
     },
     {
-      "phase": "F6",
+      "phase": "F5",
       "event": "gate_passed",
-      "detail": "G6"
+      "detail": "G5"
+    },
+    {
+      "phase": "F6",
+      "event": "skipped",
+      "detail": "no previous report"
+    },
+    {
+      "phase": "F7",
+      "event": "gate_passed",
+      "detail": "G7"
     }
   ]
 }

@@ -1,0 +1,358 @@
+{
+  "suite": {
+    "status": "in_scope",
+    "files": [
+      "test_orders.py"
+    ],
+    "searched": "test_*.py and tests/ under the module root; one test module found",
+    "reason": null
+  },
+  "tests": [
+    {
+      "id": "X-1",
+      "name": "test_checkout_totals_the_items",
+      "technique": "example",
+      "operators": [
+        "O-1",
+        "O-3"
+      ],
+      "evidence": [
+        {
+          "file": "test_orders.py",
+          "line": 34,
+          "quote": "def test_checkout_totals_the_items(self):"
+        }
+      ]
+    },
+    {
+      "id": "X-2",
+      "name": "test_cancel_a_pending_order",
+      "technique": "example",
+      "operators": [
+        "O-5"
+      ],
+      "evidence": [
+        {
+          "file": "test_orders.py",
+          "line": 39,
+          "quote": "def test_cancel_a_pending_order(self):"
+        }
+      ]
+    },
+    {
+      "id": "X-3",
+      "name": "test_ship_then_deliver",
+      "technique": "sequence",
+      "operators": [
+        "O-4",
+        "O-8",
+        "O-9"
+      ],
+      "evidence": [
+        {
+          "file": "test_orders.py",
+          "line": 44,
+          "quote": "def test_ship_then_deliver(self):"
+        }
+      ]
+    },
+    {
+      "id": "X-4",
+      "name": "test_deliver_rejects_an_unshipped_order",
+      "technique": "example",
+      "operators": [
+        "O-9"
+      ],
+      "evidence": [
+        {
+          "file": "test_orders.py",
+          "line": 53,
+          "quote": "def test_deliver_rejects_an_unshipped_order(self):"
+        }
+      ]
+    },
+    {
+      "id": "X-5",
+      "name": "test_refund_moves_the_order_to_refund_pending",
+      "technique": "example",
+      "operators": [
+        "O-4",
+        "O-7"
+      ],
+      "evidence": [
+        {
+          "file": "test_orders.py",
+          "line": 58,
+          "quote": "def test_refund_moves_the_order_to_refund_pending(self):"
+        }
+      ]
+    },
+    {
+      "id": "X-6",
+      "name": "test_full_payment_marks_the_order_paid",
+      "technique": "example",
+      "operators": [
+        "O-10"
+      ],
+      "evidence": [
+        {
+          "file": "test_orders.py",
+          "line": 66,
+          "quote": "def test_full_payment_marks_the_order_paid(self):"
+        }
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "invariant": "I-1",
+      "level": "contradicted",
+      "tests": [
+        "X-5"
+      ],
+      "evidence": [
+        {
+          "file": "test_orders.py",
+          "line": 62,
+          "quote": "self.assertEqual(order.status, \"refund_pending\")"
+        }
+      ],
+      "reason": "The test asserts that refund writes refund_pending, a value outside STATUS",
+      "finding": "operations.py:refund:closure:undeclared-state"
+    },
+    {
+      "invariant": "I-2",
+      "level": "weak",
+      "tests": [
+        "X-2"
+      ],
+      "evidence": [],
+      "reason": "cancel is exercised only from pending_payment; no test tries to cancel a shipped order",
+      "finding": null
+    },
+    {
+      "invariant": "I-3",
+      "level": "asserted",
+      "tests": [
+        "X-4"
+      ],
+      "evidence": [
+        {
+          "file": "test_orders.py",
+          "line": 55,
+          "quote": "with self.assertRaises(ValueError):"
+        }
+      ],
+      "reason": null,
+      "finding": null
+    },
+    {
+      "invariant": "I-4",
+      "level": "weak",
+      "tests": [
+        "X-1"
+      ],
+      "evidence": [],
+      "reason": "The equality is asserted only right after checkout; no test adds an item or a discount afterwards",
+      "finding": null
+    },
+    {
+      "invariant": "I-5",
+      "level": "uncovered",
+      "tests": [],
+      "evidence": [],
+      "reason": "No test applies any operator to a delivered or canceled order",
+      "finding": null
+    },
+    {
+      "invariant": "I-6",
+      "level": "weak",
+      "tests": [
+        "X-6"
+      ],
+      "evidence": [],
+      "reason": "The webhook test delivers each event once; a single delivery cannot catch a duplicate",
+      "finding": null
+    },
+    {
+      "invariant": "I-7",
+      "level": "weak",
+      "tests": [
+        "X-3"
+      ],
+      "evidence": [],
+      "reason": "Shipping is tested only on the happy path; no test makes the courier fail after the reservation",
+      "finding": null
+    },
+    {
+      "invariant": "I-8",
+      "level": "uncovered",
+      "tests": [],
+      "evidence": [],
+      "reason": "No test calls hold, and no resume operation exists to test",
+      "finding": null
+    }
+  ],
+  "cells_tested": [
+    {
+      "machine": "M-1",
+      "cell": "draft/O-3",
+      "tests": [
+        "X-1"
+      ]
+    },
+    {
+      "machine": "M-1",
+      "cell": "pending_payment/O-5",
+      "tests": [
+        "X-2"
+      ]
+    },
+    {
+      "machine": "M-1",
+      "cell": "shipped/O-9",
+      "tests": [
+        "X-3"
+      ]
+    },
+    {
+      "machine": "M-1",
+      "cell": "pending_payment/O-9",
+      "tests": [
+        "X-4"
+      ]
+    }
+  ],
+  "finding_gaps": [
+    {
+      "finding": "operations.py:refund:closure:undeclared-state",
+      "status": "enshrined",
+      "tests": [
+        "X-5"
+      ],
+      "evidence": [
+        {
+          "file": "test_orders.py",
+          "line": 62,
+          "quote": "self.assertEqual(order.status, \"refund_pending\")"
+        }
+      ],
+      "note": "The suite passes because it asserts the defective status; fixing refund turns this test red"
+    },
+    {
+      "finding": "models.py:status:reachability:in-review-unreachable",
+      "status": "undetected",
+      "tests": [],
+      "evidence": [],
+      "note": "No test walks a payment through in_review"
+    },
+    {
+      "finding": "operations.py:status-writers:completeness:state-blind",
+      "status": "undetected",
+      "tests": [],
+      "evidence": [],
+      "note": "Only deliver has a refusal test; no other operator is tried from a forbidden state"
+    },
+    {
+      "finding": "operations.py:hold:symmetry:no-resume",
+      "status": "undetected",
+      "tests": [],
+      "evidence": [],
+      "note": "hold is never called by the suite"
+    },
+    {
+      "finding": "operations.py:apply_discount:ambiguity:value-unit",
+      "status": "undetected",
+      "tests": [],
+      "evidence": [],
+      "note": "apply_discount is never called by the suite"
+    },
+    {
+      "finding": "operations.py:total:minimal-expression:stored-and-derived",
+      "status": "undetected",
+      "tests": [],
+      "evidence": [],
+      "note": "The total is checked only right after checkout, before anything could make it drift"
+    },
+    {
+      "finding": "webhook.py:handle_payment_webhook:idempotency:no-dedup",
+      "status": "undetected",
+      "tests": [],
+      "evidence": [],
+      "note": "Every webhook test delivers an event once"
+    },
+    {
+      "finding": "operations.py:ship:partial-failure:not-atomic",
+      "status": "undetected",
+      "tests": [],
+      "evidence": [],
+      "note": "No test makes the courier fail"
+    }
+  ],
+  "by_category": {
+    "state": {
+      "total": 1,
+      "asserted": 0,
+      "weak": 0,
+      "contradicted": 1,
+      "uncovered": 0,
+      "not_verifiable": 0
+    },
+    "transition": {
+      "total": 2,
+      "asserted": 1,
+      "weak": 1,
+      "contradicted": 0,
+      "uncovered": 0,
+      "not_verifiable": 0
+    },
+    "logical": {
+      "total": 1,
+      "asserted": 0,
+      "weak": 1,
+      "contradicted": 0,
+      "uncovered": 0,
+      "not_verifiable": 0
+    },
+    "temporal": {
+      "total": 1,
+      "asserted": 0,
+      "weak": 0,
+      "contradicted": 0,
+      "uncovered": 1,
+      "not_verifiable": 0
+    },
+    "repetition": {
+      "total": 1,
+      "asserted": 0,
+      "weak": 1,
+      "contradicted": 0,
+      "uncovered": 0,
+      "not_verifiable": 0
+    },
+    "concurrency": {
+      "total": 0,
+      "asserted": 0,
+      "weak": 0,
+      "contradicted": 0,
+      "uncovered": 0,
+      "not_verifiable": 0
+    },
+    "atomicity": {
+      "total": 1,
+      "asserted": 0,
+      "weak": 1,
+      "contradicted": 0,
+      "uncovered": 0,
+      "not_verifiable": 0
+    },
+    "algebraic": {
+      "total": 1,
+      "asserted": 0,
+      "weak": 0,
+      "contradicted": 0,
+      "uncovered": 1,
+      "not_verifiable": 0
+    }
+  }
+}

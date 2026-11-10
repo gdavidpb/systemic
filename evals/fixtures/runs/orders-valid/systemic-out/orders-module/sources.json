@@ -4,25 +4,36 @@
       "path": "README.md",
       "sha256": "1072f5824b072f8d929ba1d04d3e09a36b92f39f513166b42500359a37fce9f1",
       "lines": 26,
-      "read": "full"
+      "read": "full",
+      "role": "source"
     },
     {
       "path": "models.py",
       "sha256": "5e5c80d0569bae26f17ab2d0787e121dfa4b21749c640cf1dcfa9e9852038cf1",
       "lines": 51,
-      "read": "full"
+      "read": "full",
+      "role": "source"
     },
     {
       "path": "operations.py",
       "sha256": "4bb83d2e297fabccb895fd1361353cd1bc39a1abf4f7736a91aa893d4bbaaa94",
       "lines": 54,
-      "read": "full"
+      "read": "full",
+      "role": "source"
     },
     {
       "path": "webhook.py",
       "sha256": "010329b7e87d049080774f24d4d1943160a7ef959660c0a6ee424fea3898d206",
       "lines": 12,
-      "read": "full"
+      "read": "full",
+      "role": "source"
+    },
+    {
+      "path": "test_orders.py",
+      "sha256": "53e84b6842a81c8ef35d038cb243e97550c2ab5a837e49330d11bcdb84d76706",
+      "lines": 70,
+      "read": "full",
+      "role": "test"
     }
   ],
   "excluded": [],

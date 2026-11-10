@@ -4,7 +4,8 @@
 
 Modeled the order lifecycle of the orders module (one system, one explicit state machine).
 Eight findings: critical: 0 · high: 6 · medium: 2 · low: 0. The most serious is that most
-operators change the status without checking the current state.
+operators change the status without checking the current state. The test suite
+asserts one of the eight defects as correct behavior and detects none of the others.
 
 ## Systems identified
 
@@ -96,6 +97,51 @@ stateDiagram-v2
 | Candidate | Refuting evidence |
 |---|---|
 | deliver writes delivered from any state | `operations.py:52` raises unless the order is shipped |
+
+## Invariant coverage by tests
+
+The suite (`test_orders.py`, six tests) was read, not run. An invariant counts as
+asserted only when a test's assertion would fail if it were violated, with a
+technique able to catch it.
+
+| Category | Invariants | asserted | weak | contradicted | uncovered | not verifiable |
+|---|---|---|---|---|---|---|
+| state | 1 | 0 | 0 | 1 | 0 | 0 |
+| transition | 2 | 1 | 1 | 0 | 0 | 0 |
+| logical | 1 | 0 | 1 | 0 | 0 | 0 |
+| temporal | 1 | 0 | 0 | 0 | 1 | 0 |
+| repetition | 1 | 0 | 1 | 0 | 0 | 0 |
+| concurrency | 0 | 0 | 0 | 0 | 0 | 0 |
+| atomicity | 1 | 0 | 1 | 0 | 0 | 0 |
+| algebraic | 1 | 0 | 0 | 0 | 1 | 0 |
+
+M-1 cells tested: 4/19 — of the defined or guarded cells of the order matrix, the
+suite exercises checkout from draft, cancel from pending_payment, and deliver from
+shipped and from pending_payment.
+
+| Invariant | Coverage | Why |
+|---|---|---|
+| I-1 every written status is in STATUS | contradicted | `test_orders.py:62` asserts `refund_pending` |
+| I-2 a shipped order is never canceled | weak | cancel is tried only from pending_payment |
+| I-3 only a shipped order is delivered | asserted | `test_orders.py:55` expects the ValueError |
+| I-4 total equals the sum of the items | weak | checked only right after checkout |
+| I-5 delivered and canceled are final | uncovered | no test touches a final order |
+| I-6 a redelivered webhook changes nothing | weak | each event is delivered once |
+| I-7 ship reserves and notifies, or neither | weak | happy path only; the courier never fails |
+| I-8 resume after hold restores the status | uncovered | hold is never called |
+
+Findings and the suite:
+
+| Finding | Suite |
+|---|---|
+| refund() writes a status outside the system | enshrined — `test_orders.py:62` passes because it asserts the defect |
+| in_review is declared but nothing produces it | undetected |
+| Operators change status without checking the current state | undetected |
+| Paused orders can never resume | undetected |
+| The discount unit depends on the value | undetected |
+| The stored total drifts from the items | undetected |
+| A retried payment webhook is counted twice | undetected |
+| A courier failure leaves inventory reserved | undetected |
 
 ## Limits and not-verified
 

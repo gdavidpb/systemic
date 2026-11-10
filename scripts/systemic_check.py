@@ -2,7 +2,7 @@
 """Deterministic gate validator for a systemic run workspace.
 
 Usage:
-    python3 systemic_check.py <G0|G1|G2|G3|G4|G5|G6|all> <run-dir> [--project-root DIR]
+    python3 systemic_check.py <G0|G1|G2|G3|G4|G5|G6|G7|all> <run-dir> [--project-root DIR]
 
 <run-dir> is the workspace a run writes, normally <project>/systemic-out/<slug>/.
 The project root defaults to two levels above it. Exit codes: 0 when the gate
@@ -23,8 +23,11 @@ import re
 import sys
 from pathlib import Path, PurePosixPath
 
-PHASES = ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7"]
-GATE_OF_PHASE = {"F0": "G0", "F1": "G1", "F2": "G2", "F3": "G3", "F4": "G4", "F5": "G5", "F6": "G6"}
+SCHEMA = "systemic.run/2"
+PHASES = ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"]
+GATE_OF_PHASE = {"F0": "G0", "F1": "G1", "F2": "G2", "F3": "G3", "F4": "G4",
+                 "F5": "G5", "F6": "G6", "F7": "G7"}
+FINAL_PHASE = PHASES[-1]
 STATUSES = {"in_progress", "needs_scope", "complete", "incomplete"}
 MODES = {"functional", "full"}
 LABELS = {"INCONSISTENCY", "RISK", "AMBIGUITY"}
@@ -34,6 +37,24 @@ REPORT_VERDICTS = {"findings": "findings", "clean": "clean", "not_verifiable": "
 CELLS = {"defined", "guarded", "hole"}
 CONFIDENCE = {"high", "medium", "low"}
 REAUDIT = {"persisting", "resolved", "not_verified"}
+ROLES = {"source", "test"}
+CATEGORIES = ["state", "transition", "logical", "temporal", "repetition", "concurrency", "atomicity", "algebraic"]
+INVARIANT_SOURCES = {"declared", "inferred"}
+LEVELS = ["asserted", "weak", "contradicted", "uncovered", "not_verifiable"]
+REPORT_LEVELS = ["asserted", "weak", "contradicted", "uncovered", "not verifiable"]
+TECHNIQUES = {"example", "sequence", "property", "stateful", "repetition", "concurrency",
+              "fault_injection", "metamorphic"}
+# The techniques whose oracle can actually catch a violation of each category.
+# A category missing here accepts any technique.
+TECHNIQUE_FIT = {
+    "temporal": {"sequence", "stateful", "property"},
+    "repetition": {"repetition", "stateful"},
+    "concurrency": {"concurrency"},
+    "atomicity": {"fault_injection"},
+    "algebraic": {"metamorphic", "property"},
+}
+SUITE_STATUS = {"in_scope", "absent", "out_of_scope"}
+GAP_STATUS = {"detected", "undetected", "enshrined"}
 FORBIDDEN_DIRS = {"node_modules", "vendor", ".git", "fixtures", "site-packages", ".venv", "venv"}
 FILLER = {"ok", "n/a", "na", "none", "-", "todo", "tbd", "yes", "no", "done", "checked", "fine", "verified"}
 MIN_TEXT = 12
@@ -41,7 +62,7 @@ SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 FINGERPRINT = re.compile(r"^[a-z0-9][a-z0-9._:/-]*$")
 LOG_NAMES = {
     "G0": "00-scope.md", "G1": "01-sources.md", "G2": "02-model.md",
-    "G3": "03-checks.md", "G4": "04-audit.md", "G5": "05-reaudit.md",
+    "G3": "03-checks.md", "G4": "04-audit.md", "G5": "05-tests.md", "G6": "06-reaudit.md",
 }
 
 
@@ -119,6 +140,9 @@ class Ctx:
                 index[entry["path"]] = entry
         return index
 
+    def test_files(self):
+        return {path for path, entry in self.files_index().items() if entry.get("role") == "test"}
+
     @property
     def profile(self):
         return (self.run or {}).get("profile", "standard")
@@ -189,8 +213,8 @@ def g0(ctx):
     e, run = [], ctx.run
     if not isinstance(run, dict):
         return ["G0 run.json: must be an object"]
-    if run.get("schema") != "systemic.run/1":
-        e.append("G0 run.json.schema: must be 'systemic.run/1'")
+    if run.get("schema") != SCHEMA:
+        e.append(f"G0 run.json.schema: must be '{SCHEMA}'")
     slug = run.get("slug")
     if not isinstance(slug, str) or not SLUG.match(slug):
         e.append("G0 run.json.slug: must be kebab-case")
@@ -210,7 +234,7 @@ def g0(ctx):
     if run.get("status") not in STATUSES:
         e.append(f"G0 run.json.status: must be one of {sorted(STATUSES)}")
     if run.get("phase") not in PHASES:
-        e.append("G0 run.json.phase: must be F0..F7")
+        e.append(f"G0 run.json.phase: must be F0..{FINAL_PHASE}")
     if run.get("validation") not in {"script", "manual"}:
         e.append("G0 run.json.validation: must be script or manual")
     if not ctx.source_root.is_dir():
@@ -280,6 +304,8 @@ def g1(ctx):
             e.append(f"G1 {where}: sha256 does not match {rel} on disk")
         if entry.get("lines") != len(lines):
             e.append(f"G1 {where}: lines is {entry.get('lines')!r}, file has {len(lines)}")
+        if entry.get("role", "source") not in ROLES:
+            e.append(f"G1 {where}.role: must be source or test")
         if entry.get("read") not in {"full", "partial"}:
             e.append(f"G1 {where}.read: must be full or partial")
         if entry.get("read") == "partial":
@@ -391,6 +417,44 @@ def g2(ctx):
         check_cites(ctx, div.get("evidence"), f"{where}.evidence", e, "G2")
     for claim in sorted(claims - linked):
         e.append(f"G2 model.json: claim {claim} is neither satisfied nor linked to a divergence")
+    machine_ids = set(ids(model.get("machines"), "M-"))
+    invariants = model.get("invariants")
+    if not isinstance(invariants, list):
+        e.append("G2 model.json.invariants: must be a list (the invariant catalog)")
+        invariants = []
+    invariant_ids, guarded_machines = set(), set()
+    for i, inv in enumerate(invariants):
+        where = f"model.json.invariants[{i}]"
+        if not isinstance(inv, dict):
+            e.append(f"G2 {where}: must be an object")
+            continue
+        iid = inv.get("id")
+        if not isinstance(iid, str) or not re.match(r"^I-\d+$", iid) or iid in invariant_ids:
+            e.append(f"G2 {where}.id: must be a unique I-<n>")
+        invariant_ids.add(iid)
+        if inv.get("category") not in CATEGORIES:
+            e.append(f"G2 {where}.category: must be one of {CATEGORIES}")
+        need_text(inv, "statement", where, e, "G2")
+        if inv.get("source") not in INVARIANT_SOURCES:
+            e.append(f"G2 {where}.source: must be declared or inferred")
+        if inv.get("source") == "declared":
+            refs = inv.get("claims") or []
+            if not refs:
+                e.append(f"G2 {where}.claims: a declared invariant names the claims that declare it")
+            for ref in refs:
+                if ref not in claims:
+                    e.append(f"G2 {where}.claims: unknown claim {ref}")
+        machine = inv.get("machine")
+        if machine is not None:
+            if machine not in machine_ids:
+                e.append(f"G2 {where}.machine: unknown machine {machine!r}")
+            guarded_machines.add(machine)
+        for ref in inv.get("operators") or []:
+            if ref not in operators:
+                e.append(f"G2 {where}.operators: unknown operator {ref}")
+        check_cites(ctx, inv.get("evidence"), f"{where}.evidence", e, "G2")
+    for mid in sorted(machine_ids - guarded_machines):
+        e.append(f"G2 model.json.invariants: machine {mid} has no invariant in the catalog")
     need_log(ctx, "G2", e)
     return e
 
@@ -560,14 +624,210 @@ def legacy_headings(text):
     return re.findall(r"^###\s+\[(?:critical|high|medium|low)\]\s+\[[A-Z]+\]", text, re.M | re.I)
 
 
+def coverage_counts(ctx):
+    """Recompute the per-category coverage from model.json and tests.json."""
+    invariants = (ctx.load("model.json") or {}).get("invariants") or []
+    category = {inv.get("id"): inv.get("category") for inv in invariants if isinstance(inv, dict)}
+    counts = {c: {"total": 0, **{level: 0 for level in LEVELS}} for c in CATEGORIES}
+    for inv in invariants:
+        if isinstance(inv, dict) and inv.get("category") in counts:
+            counts[inv["category"]]["total"] += 1
+    for entry in (ctx.load("tests.json") or {}).get("coverage") or []:
+        if not isinstance(entry, dict):
+            continue
+        cat = category.get(entry.get("invariant"))
+        if cat in counts and entry.get("level") in LEVELS:
+            counts[cat][entry["level"]] += 1
+    return counts
+
+
+def matrix_cells(ctx):
+    """{machine: {"state/operator": cell}} for every matrix in checks.json."""
+    out = {}
+    for matrix in (ctx.load("checks.json") or {}).get("matrices") or []:
+        if not isinstance(matrix, dict):
+            continue
+        ops = matrix.get("operators") or []
+        cells = {}
+        for state, row in (matrix.get("rows") or {}).items():
+            for op, cell in zip(ops, row or []):
+                cells[f"{state}/{op}"] = cell
+        out[matrix.get("machine")] = cells
+    return out
+
+
+def cells_tested(ctx):
+    """{machine: (tested, testable)}: testable cells are defined or guarded."""
+    tested = {}
+    for entry in (ctx.load("tests.json") or {}).get("cells_tested") or []:
+        if isinstance(entry, dict):
+            tested.setdefault(entry.get("machine"), set()).add(entry.get("cell"))
+    out = {}
+    for machine, cells in matrix_cells(ctx).items():
+        testable = {k for k, v in cells.items() if v in {"defined", "guarded"}}
+        out[machine] = (len(testable & tested.get(machine, set())), len(testable))
+    return out
+
+
 def g5(ctx):
+    e = []
+    data = ctx.load("tests.json")
+    if not isinstance(data, dict):
+        return ["G5 tests.json: missing or not an object"]
+    model = ctx.load("model.json") or {}
+    invariants = {inv.get("id"): inv for inv in model.get("invariants") or [] if isinstance(inv, dict)}
+    operators = set(ids(model.get("operators"), "O-"))
+    test_files = ctx.test_files()
+    fingerprints = {f.get("fingerprint") for f in (ctx.load("findings.json") or {}).get("confirmed") or []}
+
+    def cite_in_tests(cites, where, minimum=1):
+        check_cites(ctx, cites, where, e, "G5", need_quote=True, minimum=minimum)
+        for i, cite in enumerate(cites if isinstance(cites, list) else []):
+            if isinstance(cite, dict) and cite.get("file") in ctx.files_index() and cite["file"] not in test_files:
+                e.append(f"G5 {where}[{i}]: {cite['file']} is not recorded with role test in sources.json")
+
+    suite = data.get("suite") or {}
+    status = suite.get("status")
+    if status not in SUITE_STATUS:
+        e.append("G5 tests.json.suite.status: must be in_scope, absent or out_of_scope")
+    if status == "in_scope":
+        files = suite.get("files") or []
+        if not files:
+            e.append("G5 tests.json.suite.files: an in-scope suite lists its test files")
+        for path in files:
+            if path not in test_files:
+                e.append(f"G5 tests.json.suite.files: {path!r} is not recorded with role test in sources.json")
+    if status == "absent":
+        need_text(suite, "searched", "tests.json.suite", e, "G5")
+        if test_files:
+            e.append("G5 tests.json.suite: status absent, but sources.json records test files")
+    if status == "out_of_scope":
+        need_text(suite, "reason", "tests.json.suite", e, "G5")
+
+    tests = {}
+    for i, test in enumerate(data.get("tests") or []):
+        where = f"tests.json.tests[{i}]"
+        tid = test.get("id") if isinstance(test, dict) else None
+        if not isinstance(tid, str) or not re.match(r"^X-\d+$", tid) or tid in tests:
+            e.append(f"G5 {where}.id: must be a unique X-<n>")
+            continue
+        tests[tid] = test
+        if not isinstance(test.get("name"), str) or not test["name"].strip():
+            e.append(f"G5 {where}.name: required")
+        if test.get("technique") not in TECHNIQUES:
+            e.append(f"G5 {where}.technique: must be one of {sorted(TECHNIQUES)}")
+        for ref in test.get("operators") or []:
+            if ref not in operators:
+                e.append(f"G5 {where}.operators: unknown operator {ref}")
+        cite_in_tests(test.get("evidence"), f"{where}.evidence")
+    if status == "in_scope" and not tests:
+        e.append("G5 tests.json.tests: an in-scope suite records the tests it read")
+    if status != "in_scope" and tests:
+        e.append("G5 tests.json.tests: only an in-scope suite can record tests")
+
+    def known_tests(refs, where, minimum=1):
+        refs = refs or []
+        if len(refs) < minimum:
+            e.append(f"G5 {where}.tests: at least {minimum} test(s) required")
+        for ref in refs:
+            if ref not in tests:
+                e.append(f"G5 {where}.tests: unknown test {ref}")
+        return [tests[r] for r in refs if r in tests]
+
+    seen = set()
+    for i, entry in enumerate(data.get("coverage") or []):
+        where = f"tests.json.coverage[{i}]"
+        if not isinstance(entry, dict):
+            e.append(f"G5 {where}: must be an object")
+            continue
+        iid, level = entry.get("invariant"), entry.get("level")
+        if iid not in invariants:
+            e.append(f"G5 {where}.invariant: unknown invariant {iid!r}")
+            continue
+        if iid in seen:
+            e.append(f"G5 {where}.invariant: {iid} already has a coverage entry")
+        seen.add(iid)
+        if level not in LEVELS:
+            e.append(f"G5 {where}.level: must be one of {LEVELS}")
+            continue
+        if status == "absent" and level != "uncovered":
+            e.append(f"G5 {where}.level: with no test suite every invariant is uncovered")
+        if status == "out_of_scope" and level != "not_verifiable":
+            e.append(f"G5 {where}.level: with the suite out of scope every invariant is not_verifiable")
+        if level == "asserted":
+            used = known_tests(entry.get("tests"), where)
+            cite_in_tests(entry.get("evidence"), f"{where}.evidence")
+            fit = TECHNIQUE_FIT.get(invariants[iid].get("category"))
+            if fit and used and not any(t.get("technique") in fit for t in used):
+                e.append(f"G5 {where}.level: a {invariants[iid].get('category')} invariant is asserted only by "
+                         f"{sorted(fit)} tests; the cited tests make it weak")
+        if level == "weak":
+            known_tests(entry.get("tests"), where)
+            need_text(entry, "reason", where, e, "G5")
+        if level == "contradicted":
+            known_tests(entry.get("tests"), where)
+            cite_in_tests(entry.get("evidence"), f"{where}.evidence")
+            finding = entry.get("finding")
+            if finding is not None and finding not in fingerprints:
+                e.append(f"G5 {where}.finding: {finding!r} is not a confirmed fingerprint")
+            if finding is None:
+                need_text(entry, "reason", where, e, "G5")
+        if level in {"uncovered", "not_verifiable"}:
+            need_text(entry, "reason", where, e, "G5")
+    for iid in sorted(i for i in invariants if isinstance(i, str)):
+        if iid not in seen:
+            e.append(f"G5 tests.json.coverage: invariant {iid} has no coverage entry")
+
+    cells = matrix_cells(ctx)
+    for i, entry in enumerate(data.get("cells_tested") or []):
+        where = f"tests.json.cells_tested[{i}]"
+        machine = entry.get("machine") if isinstance(entry, dict) else None
+        if machine not in cells:
+            e.append(f"G5 {where}.machine: {machine!r} has no matrix in checks.json")
+            continue
+        cell = cells[machine].get(entry.get("cell"))
+        if cell is None:
+            e.append(f"G5 {where}.cell: {entry.get('cell')!r} is not a state/operator cell of {machine}")
+        elif cell == "hole":
+            e.append(f"G5 {where}.cell: {entry.get('cell')} is a hole; only defined or guarded cells are tested")
+        known_tests(entry.get("tests"), where)
+
+    gapped = set()
+    for i, gap in enumerate(data.get("finding_gaps") or []):
+        where = f"tests.json.finding_gaps[{i}]"
+        fp = gap.get("finding") if isinstance(gap, dict) else None
+        if fp not in fingerprints:
+            e.append(f"G5 {where}.finding: {fp!r} is not a confirmed fingerprint")
+            continue
+        if fp in gapped:
+            e.append(f"G5 {where}.finding: {fp} is classified twice")
+        gapped.add(fp)
+        if gap.get("status") not in GAP_STATUS:
+            e.append(f"G5 {where}.status: must be detected, undetected or enshrined")
+        elif gap["status"] in {"detected", "enshrined"}:
+            known_tests(gap.get("tests"), where)
+            cite_in_tests(gap.get("evidence"), f"{where}.evidence")
+        if status == "absent" and gap.get("status") != "undetected":
+            e.append(f"G5 {where}.status: with no test suite every finding is undetected")
+    for fp in sorted(f for f in fingerprints if isinstance(f, str)):
+        if fp not in gapped:
+            e.append(f"G5 tests.json.finding_gaps: confirmed {fp} is not classified")
+
+    expected = coverage_counts(ctx)
+    if data.get("by_category") != expected:
+        e.append(f"G5 tests.json.by_category: must be {expected}")
+    need_log(ctx, "G5", e)
+    return e
+
+
+def g6(ctx):
     e = []
     prior = ctx.run.get("prior_report")
     if prior is None:
         return e
     data = ctx.load("reaudit.json")
     if not isinstance(data, dict):
-        return ["G5 reaudit.json: missing or not an object (a previous report exists)"]
+        return ["G6 reaudit.json: missing or not an object (a previous report exists)"]
     current = {f.get("fingerprint") for f in (ctx.load("findings.json") or {}).get("confirmed") or []}
     entries = data.get("prior_findings") or []
     counts = {"new": 0, "persisting": 0, "resolved": 0, "not_verified": 0}
@@ -578,47 +838,47 @@ def g5(ctx):
         keys.append(entry.get("key"))
         status = entry.get("status")
         if status not in REAUDIT:
-            e.append(f"G5 {where}.status: must be persisting, resolved or not_verified")
+            e.append(f"G6 {where}.status: must be persisting, resolved or not_verified")
             continue
         counts[status] += 1
         if status == "persisting":
             target = entry.get("current")
             if target not in current:
-                e.append(f"G5 {where}.current: {target!r} is not a confirmed fingerprint")
+                e.append(f"G6 {where}.current: {target!r} is not a confirmed fingerprint")
             elif target in persisted_into:
-                e.append(f"G5 {where}.current: {target} already continues {persisted_into[target]}")
+                e.append(f"G6 {where}.current: {target} already continues {persisted_into[target]}")
             persisted_into[target] = entry.get("key")
         if status == "resolved":
-            need_text(entry, "resolution", where, e, "G5")
-            check_cites(ctx, entry.get("evidence"), f"{where}.evidence", e, "G5", need_quote=True)
+            need_text(entry, "resolution", where, e, "G6")
+            check_cites(ctx, entry.get("evidence"), f"{where}.evidence", e, "G6", need_quote=True)
         if status == "not_verified":
             for key in ("last_evidence", "changed", "needed"):
-                need_text(entry, key, where, e, "G5")
+                need_text(entry, key, where, e, "G6")
     if len(set(keys)) != len(keys):
-        e.append("G5 reaudit.json.prior_findings: each previous finding is classified once")
+        e.append("G6 reaudit.json.prior_findings: each previous finding is classified once")
     new = data.get("new") or []
     for fp in new:
         if fp not in current:
-            e.append(f"G5 reaudit.json.new: {fp!r} is not a confirmed fingerprint")
+            e.append(f"G6 reaudit.json.new: {fp!r} is not a confirmed fingerprint")
         if fp in persisted_into:
-            e.append(f"G5 reaudit.json.new: {fp} is also persisting")
+            e.append(f"G6 reaudit.json.new: {fp} is also persisting")
     counts["new"] = len(new)
     for fp in sorted(x for x in current if isinstance(x, str)):
         if fp not in persisted_into and fp not in new:
-            e.append(f"G5 reaudit.json: confirmed {fp} is neither new nor persisting")
+            e.append(f"G6 reaudit.json: confirmed {fp} is neither new nor persisting")
     if data.get("counts") != counts:
-        e.append(f"G5 reaudit.json.counts: must be {counts}")
+        e.append(f"G6 reaudit.json.counts: must be {counts}")
     if isinstance(prior, dict) and prior.get("format") == "json":
         old = json.loads((ctx.run_dir / "prior" / "findings.json").read_text(encoding="utf-8"))
         expected = {f.get("fingerprint") for f in old.get("confirmed") or []}
         if set(keys) != expected:
-            e.append(f"G5 reaudit.json.prior_findings: keys must be the previous fingerprints {sorted(expected)}")
+            e.append(f"G6 reaudit.json.prior_findings: keys must be the previous fingerprints {sorted(expected)}")
     elif isinstance(prior, dict):
         text = (ctx.run_dir / "prior" / "report.md").read_text(encoding="utf-8")
         expected = len(legacy_headings(text))
         if len(entries) != expected:
-            e.append(f"G5 reaudit.json.prior_findings: previous report has {expected} findings, {len(entries)} classified")
-    need_log(ctx, "G5", e)
+            e.append(f"G6 reaudit.json.prior_findings: previous report has {expected} findings, {len(entries)} classified")
+    need_log(ctx, "G6", e)
     return e
 
 
@@ -626,12 +886,12 @@ def strip_code(text):
     return re.sub(r"```.*?```", "", text, flags=re.S)
 
 
-def g6(ctx):
+def g7(ctx):
     e = []
     report_rel = ctx.run.get("report_path")
     path = ctx.root / report_rel if isinstance(report_rel, str) else None
     if path is None or not path.is_file():
-        return [f"G6 {report_rel}: the report has not been written"]
+        return [f"G7 {report_rel}: the report has not been written"]
     text = path.read_text(encoding="utf-8")
     if ctx.run.get("status") == "incomplete":
         return e
@@ -641,37 +901,61 @@ def g6(ctx):
     for severity, label, title in headings:
         by_title.setdefault(norm(title).lower(), []).append((severity.lower(), label))
     if len(headings) != len(findings):
-        e.append(f"G6 report: {len(headings)} finding headings, findings.json has {len(findings)} confirmed")
+        e.append(f"G7 report: {len(headings)} finding headings, findings.json has {len(findings)} confirmed")
     for i, finding in enumerate(findings):
         title = norm(str(finding.get("title", ""))).lower()
         found = by_title.get(title)
         if not found:
-            e.append(f"G6 report: confirmed[{i}] '{finding.get('title')}' has no '### [severity] [LABEL] title' heading")
+            e.append(f"G7 report: confirmed[{i}] '{finding.get('title')}' has no '### [severity] [LABEL] title' heading")
         elif len(found) > 1:
-            e.append(f"G6 report: '{finding.get('title')}' appears more than once")
+            e.append(f"G7 report: '{finding.get('title')}' appears more than once")
         elif found[0] != (finding.get("severity"), finding.get("label")):
-            e.append(f"G6 report: '{finding.get('title')}' is shown as {found[0]}, recorded as "
+            e.append(f"G7 report: '{finding.get('title')}' is shown as {found[0]}, recorded as "
                      f"({finding.get('severity')}, {finding.get('label')})")
     summary = text.split("\n### ", 1)[0]
     for severity in SEVERITIES:
         expected = sum(1 for f in findings if f.get("severity") == severity)
         match = re.search(rf"\b{severity}:\s*(\d+)", summary)
         if not match:
-            e.append(f"G6 report summary: missing the count line entry '{severity}: N'")
+            e.append(f"G7 report summary: missing the count line entry '{severity}: N'")
         elif int(match.group(1)) != expected:
-            e.append(f"G6 report summary: {severity}: {match.group(1)}, findings.json has {expected}")
+            e.append(f"G7 report summary: {severity}: {match.group(1)}, findings.json has {expected}")
     if ctx.run.get("prior_report") is not None:
         counts = (ctx.load("reaudit.json") or {}).get("counts") or {}
         for key, label in (("new", "new"), ("persisting", "persisting"),
                            ("resolved", "resolved"), ("not_verified", "not verified")):
             match = re.search(rf"\b{label}:\s*(\d+)", summary)
             if not match:
-                e.append(f"G6 report summary: missing the re-audit count '{label}: N'")
+                e.append(f"G7 report summary: missing the re-audit count '{label}: N'")
             elif int(match.group(1)) != counts.get(key):
-                e.append(f"G6 report summary: {label}: {match.group(1)}, reaudit.json has {counts.get(key)}")
+                e.append(f"G7 report summary: {label}: {match.group(1)}, reaudit.json has {counts.get(key)}")
+    if ctx.load("tests.json") is not None:
+        counts = coverage_counts(ctx)
+        pattern = (r"^\|\s*(" + "|".join(CATEGORIES) + r")\s*\|" + r"\s*(\d+)\s*\|" * (1 + len(LEVELS)))
+        table = {}
+        for row in re.findall(pattern, text, re.M):
+            table.setdefault(row[0], []).append([int(x) for x in row[1:]])
+        for category in CATEGORIES:
+            rows = table.get(category)
+            expected = [counts[category]["total"]] + [counts[category][level] for level in LEVELS]
+            if not rows:
+                e.append(f"G7 report: the invariant coverage table needs a row for {category} "
+                         f"(total · {' · '.join(REPORT_LEVELS)})")
+            elif len(rows) > 1:
+                e.append(f"G7 report: the invariant coverage table has {category} more than once")
+            elif rows[0] != expected:
+                e.append(f"G7 report: invariant coverage for {category} reads {rows[0]}, tests.json has {expected}")
+        if ctx.run.get("mode") == "full":
+            for machine, (tested, testable) in sorted(cells_tested(ctx).items()):
+                match = re.search(rf"\b{re.escape(str(machine))} cells tested:\s*(\d+)\s*/\s*(\d+)", text)
+                if not match:
+                    e.append(f"G7 report: full mode states '{machine} cells tested: {tested}/{testable}'")
+                elif (int(match.group(1)), int(match.group(2))) != (tested, testable):
+                    e.append(f"G7 report: {machine} cells tested reads {match.group(1)}/{match.group(2)}, "
+                             f"records give {tested}/{testable}")
     prose = strip_code(text)
     if re.search(r"<\s*/?\s*(div|span|br|table|tr|td|html|body|script|style|p|img)\b", prose, re.I):
-        e.append("G6 report: contains HTML tags; the report is plain Markdown")
+        e.append("G7 report: contains HTML tags; the report is plain Markdown")
     rows = re.findall(r"^\|\s*(\d{1,2})\s*\|[^|\n]*\|\s*([^|\n]+?)\s*\|", text, re.M)
     mode = ctx.run.get("mode")
     if mode == "full":
@@ -680,23 +964,23 @@ def g6(ctx):
         for num, verdict in rows:
             table.setdefault(int(num), []).append(verdict)
         if sorted(k for k in table if 1 <= k <= 12) != list(range(1, 13)):
-            e.append("G6 report: full mode needs the coverage table with one row per check 1..12")
+            e.append("G7 report: full mode needs the coverage table with one row per check 1..12")
         for num in range(1, 13):
             cells = table.get(num) or []
             word = REPORT_VERDICTS.get(checks.get(num), "")
             if cells and not any(c.lower().startswith(word) for c in cells):
-                e.append(f"G6 report: check {num} verdict must read '{word}' as in checks.json")
+                e.append(f"G7 report: check {num} verdict must read '{word}' as in checks.json")
     if mode == "functional":
         if "```mermaid" in text:
-            e.append("G6 report: functional mode must not include mermaid diagrams")
+            e.append("G7 report: functional mode must not include mermaid diagrams")
         if re.search(r"^\s*[-*]\s*\*\*Check\*\*", text, re.M):
-            e.append("G6 report: functional mode must not include check numbers")
+            e.append("G7 report: functional mode must not include check numbers")
         if len({int(n) for n, _ in rows if 1 <= int(n) <= 12}) == 12:
-            e.append("G6 report: functional mode must not include the twelve-check coverage table")
+            e.append("G7 report: functional mode must not include the twelve-check coverage table")
     return e
 
 
-GATES = {"G0": g0, "G1": g1, "G2": g2, "G3": g3, "G4": g4, "G5": g5, "G6": g6}
+GATES = {"G0": g0, "G1": g1, "G2": g2, "G3": g3, "G4": g4, "G5": g5, "G6": g6, "G7": g7}
 
 
 def run_all(ctx):
@@ -713,8 +997,8 @@ def run_all(ctx):
         gate = GATE_OF_PHASE.get(name)
         if gate:
             errors += GATES[gate](ctx)
-    if status == "complete" and phase != "F7":
-        errors.append("ALL run.json: status complete requires phase F7")
+    if status == "complete" and phase != FINAL_PHASE:
+        errors.append(f"ALL run.json: status complete requires phase {FINAL_PHASE}")
     if status == "incomplete":
         report = run.get("report_path")
         if not isinstance(report, str) or not (ctx.root / report).is_file():
@@ -728,12 +1012,12 @@ def main(argv):
     if "--project-root" in args:
         i = args.index("--project-root")
         if i + 1 >= len(args):
-            print("usage: systemic_check.py <G0..G6|all> <run-dir> [--project-root DIR]")
+            print("usage: systemic_check.py <G0..G7|all> <run-dir> [--project-root DIR]")
             return 2
         root = Path(args[i + 1])
         del args[i:i + 2]
     if len(args) != 2 or (args[0] not in GATES and args[0] != "all"):
-        print("usage: systemic_check.py <G0..G6|all> <run-dir> [--project-root DIR]")
+        print("usage: systemic_check.py <G0..G7|all> <run-dir> [--project-root DIR]")
         return 2
     gate, run_dir = args[0], Path(args[1]).resolve()
     if not run_dir.is_dir():

@@ -187,8 +187,8 @@ Fix what is analyzed, how, and where it is delivered, before reading code.
      name collision), keep it byte for byte, use `<slug>-systemic` (or the
      next free `-systemic-2`, …) as the slug, write alongside, and say so in
      chat. A heading that merely mentions the scope does not make a file a
-     systemic report: it must have the report structure (the count line and
-     `### [severity] [LABEL]` headings or the no-findings statement).
+     systemic report: it must have `### [severity] [LABEL]` headings (older
+     reports may lack the count line) or the no-findings statement.
 - **Outputs**: `run.json`, `00-scope.md`.
 - **Invariants**: the mode is `full` only if the user asked for it. A previous
   report does not set the mode.
@@ -350,7 +350,7 @@ itself a system, and this phase is its consistency check.
   `verification: independent` on the findings it confirmed and `self` on the
   others. Without subagents, run 4a and 4b yourself, strictly against
   re-read sources, never against memory, and every finding is `self`.
-- **Outputs**: `findings.json`; `04-audit.md` with the log of every gate.
+- **Outputs**: `findings.json`; `04-audit.md`: what 4a–4d decided, per candidate.
 - **Gate G4.**
 
 ## F5 — Test audit
@@ -450,10 +450,10 @@ Render the selected mode from the records, not from memory.
   run keeps the phase that failed. Then run `systemic_check.py all
   <workspace>`: it checks every phase before the current one. If it fails on
   a complete run, fix the reported phase as the run protocol says.
-- In chat, reply with the report path, the executive summary and the single
-  most serious finding, plus the most serious test gap when there is one (an
-  enshrined finding first, then an important category with nothing
-  asserted); the user reads the rest in the file. For an
+- In chat, in the language the user is writing in, reply with the report
+  path, the executive summary and the single most serious finding, plus the
+  most serious test gap when there is one (an enshrined finding first, then
+  an important category with nothing asserted); the rest is in the file. For an
   incomplete run, lead with what is missing and how to unblock it. Do not
   publish the report as an artifact, render it to HTML, or start a server,
   preview or localhost port to display it.

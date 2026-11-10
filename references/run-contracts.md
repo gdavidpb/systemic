@@ -16,7 +16,9 @@ systemic-out/
     ├── prior/          F0, only on a re-audit: report.md (+ findings.json)
     └── 00-scope.md … 06-reaudit.md   phase logs (profile standard)
         or work.md                    single log (profile quick), one
-                                      `## F<n>` section per finished phase **[gate]**
+                                      `## F<n>` section per phase that has a
+                                      log: F0–F5, and F6 on a re-audit
+                                      **[gate]**; F7 and F8 write none
 ```
 
 The JSON files are the source of truth. The report is rendered from them and
@@ -68,7 +70,8 @@ Conventions:
 
 **Re-audit setup.** When `systemic-out/<slug>.md` already exists and is a
 systemic report of the same scope, F0 archives it before anything is
-overwritten. The report goes to `<slug>/prior/report.md`. A previous
+overwritten. The report is copied to `<slug>/prior/report.md` (F7 later
+replaces the original). A previous
 `<slug>/findings.json`, if there is one, goes to `<slug>/prior/findings.json`;
 in that case `format` is `json`, otherwise `md-legacy` **[gate]**. Discard the
 rest of the previous workspace, including any older `prior/`.

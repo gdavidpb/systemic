@@ -680,7 +680,11 @@ def g4(ctx):
     for machine in model.get("machines") or []:
         for tr in (machine.get("transitions") or []) if isinstance(machine, dict) else []:
             if isinstance(tr, dict):
-                machine_of[tr.get("id")] = machine.get("id")
+                machine_of.setdefault(tr.get("id"), set()).add(machine.get("id"))
+                machine_of.setdefault(tr.get("operator"), set()).add(machine.get("id"))
+    for inv in model.get("invariants") or []:
+        if isinstance(inv, dict) and inv.get("machine"):
+            machine_of.setdefault(inv.get("id"), set()).add(inv["machine"])
     cand_refs = {c.get("id"): c.get("refs") or [] for c in (ctx.load("checks.json") or {}).get("candidates") or []
                  if isinstance(c, dict)}
     merged_into = {}
@@ -692,7 +696,10 @@ def g4(ctx):
         if not isinstance(finding, dict) or finding.get("check") != 3:
             continue
         owned = [finding.get("candidate")] + merged_into.get(finding.get("fingerprint"), [])
-        machines = {machine_of.get(ref) for cid in owned for ref in cand_refs.get(cid, [])} - {None}
+        machines = set()
+        for cid in owned:
+            for ref in cand_refs.get(cid, []):
+                machines |= machine_of.get(ref, set())
         for mid in machines:
             by_machine.setdefault(mid, []).append((i, finding))
     for mid, group in sorted(by_machine.items()):

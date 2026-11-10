@@ -128,7 +128,8 @@ names one. A profile changes cost, never the evidence bar.
    phase's log opens with a line `returned_to: <reason>` (a fixed keyword,
    in every language) **[gate]**. Never patch an
    earlier file silently.
-3. **Gates.** After writing a phase's files, run
+3. **Gates.** After writing a phase's files and its log (the phase log,
+   or its `work.md` section), run
    `python3 <skill-dir>/scripts/systemic_check.py <gate> <workspace>`. Fix
    the reported violations inside the same phase and run it again, at most
    two corrections. If it still fails — or at once, when every fix would
@@ -354,7 +355,8 @@ itself a system, and this phase is its consistency check.
     table exists (writing an undeclared state is closure, not a missing
     guard). A hole that needs an operator that does not exist (a review
     step nothing performs) belongs to the finding about that missing
-    operator. This rule is the isolated-repair test applied to a machine —
+    operator, recorded under that finding's own check (usually 4,
+    reachability), not under 3. This rule is the isolated-repair test applied to a machine —
     the shared repair is the transition function — so it wins over
     keeping each operator separate. Record the finding under check 3 and
     list the other checks among its manifestations. A second check-3

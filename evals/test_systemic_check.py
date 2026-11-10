@@ -406,6 +406,17 @@ class G4Findings(GateTestCase):
                      .update(refs=["T-3"]))
         self.assertFails("G4", "are one finding unless")
 
+    def test_grouping_also_follows_operator_refs(self):
+        def split(d):
+            twin = dict(d["confirmed"][2], fingerprint="operations.py:ship:completeness:no-guard",
+                        title="ship ignores the current state", candidate="C-9")
+            d["merged"] = [m for m in d["merged"] if m["candidate"] != "C-9"]
+            d["confirmed"].append(twin)
+        self.ws.edit("findings.json", split)
+        self.ws.edit("checks.json", lambda d: next(c for c in d["candidates"] if c["id"] == "C-9")
+                     .update(refs=["O-8"]))
+        self.assertFails("G4", "are one finding unless")
+
     def test_a_justified_second_finding_on_the_machine_passes(self):
         def split(d):
             twin = dict(d["confirmed"][2], fingerprint="operations.py:mark_paid:completeness:no-amount-check",

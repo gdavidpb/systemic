@@ -1,0 +1,548 @@
+{
+  "checks": [
+    {
+      "id": 1,
+      "name": "closure",
+      "verdict": "findings",
+      "candidates": [
+        "C-1",
+        "C-10"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "operator ambiguity",
+      "verdict": "findings",
+      "candidates": [
+        "C-5"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "transition completeness",
+      "verdict": "findings",
+      "candidates": [
+        "C-3"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "reachability",
+      "verdict": "findings",
+      "candidates": [
+        "C-2",
+        "C-9"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "illegal states representable",
+      "verdict": "not_verifiable",
+      "missing": "There is no persistence schema in scope, so which field combinations the store accepts cannot be established"
+    },
+    {
+      "id": 6,
+      "name": "invariants and partial failure",
+      "verdict": "findings",
+      "candidates": [
+        "C-8"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "idempotency",
+      "verdict": "findings",
+      "candidates": [
+        "C-7"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "concurrency",
+      "verdict": "not_verifiable",
+      "missing": "Order is an in-memory dataclass; no persistence or locking layer is in scope"
+    },
+    {
+      "id": 9,
+      "name": "symmetry",
+      "verdict": "findings",
+      "candidates": [
+        "C-4"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "minimal expression",
+      "verdict": "findings",
+      "candidates": [
+        "C-6"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "system limits",
+      "verdict": "not_verifiable",
+      "missing": "The material states no pending requirement to compare against the representable set"
+    },
+    {
+      "id": 12,
+      "name": "feedback loops",
+      "verdict": "clean",
+      "verified": "No retry, queue or timeout cycle exists in scope: the webhook calls mark_paid once and nothing re-enqueues work",
+      "evidence": [
+        {
+          "file": "webhook.py",
+          "line": 12,
+          "quote": "mark_paid(order)"
+        }
+      ]
+    }
+  ],
+  "matrices": [
+    {
+      "machine": "M-1",
+      "operators": [
+        "O-3",
+        "O-4",
+        "O-5",
+        "O-6",
+        "O-7",
+        "O-8",
+        "O-9"
+      ],
+      "rows": {
+        "draft": [
+          "defined",
+          "hole",
+          "defined",
+          "defined",
+          "hole",
+          "hole",
+          "guarded"
+        ],
+        "pending_payment": [
+          "hole",
+          "hole",
+          "defined",
+          "defined",
+          "hole",
+          "hole",
+          "guarded"
+        ],
+        "in_review": [
+          "hole",
+          "defined",
+          "hole",
+          "defined",
+          "hole",
+          "hole",
+          "guarded"
+        ],
+        "paid": [
+          "hole",
+          "hole",
+          "hole",
+          "defined",
+          "hole",
+          "defined",
+          "guarded"
+        ],
+        "shipped": [
+          "hole",
+          "hole",
+          "hole",
+          "defined",
+          "hole",
+          "hole",
+          "defined"
+        ],
+        "delivered": [
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "guarded"
+        ],
+        "canceled": [
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "guarded"
+        ],
+        "on_hold": [
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "guarded"
+        ],
+        "refund_pending": [
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "guarded"
+        ]
+      },
+      "notes": {
+        "draft/O-4": {
+          "candidate": "C-3"
+        },
+        "draft/O-7": {
+          "candidate": "C-3"
+        },
+        "draft/O-8": {
+          "candidate": "C-3"
+        },
+        "pending_payment/O-3": {
+          "candidate": "C-3"
+        },
+        "pending_payment/O-4": {
+          "candidate": "C-3"
+        },
+        "pending_payment/O-7": {
+          "candidate": "C-3"
+        },
+        "pending_payment/O-8": {
+          "candidate": "C-3"
+        },
+        "in_review/O-3": {
+          "candidate": "C-3"
+        },
+        "in_review/O-5": {
+          "candidate": "C-3"
+        },
+        "in_review/O-7": {
+          "candidate": "C-3"
+        },
+        "in_review/O-8": {
+          "candidate": "C-3"
+        },
+        "paid/O-3": {
+          "candidate": "C-3"
+        },
+        "paid/O-4": {
+          "candidate": "C-3"
+        },
+        "paid/O-5": {
+          "candidate": "C-3"
+        },
+        "paid/O-7": {
+          "candidate": "C-3"
+        },
+        "shipped/O-3": {
+          "candidate": "C-3"
+        },
+        "shipped/O-4": {
+          "candidate": "C-3"
+        },
+        "shipped/O-5": {
+          "candidate": "C-3"
+        },
+        "shipped/O-7": {
+          "candidate": "C-3"
+        },
+        "shipped/O-8": {
+          "candidate": "C-3"
+        },
+        "delivered/O-3": {
+          "candidate": "C-3"
+        },
+        "delivered/O-4": {
+          "candidate": "C-3"
+        },
+        "delivered/O-5": {
+          "candidate": "C-3"
+        },
+        "delivered/O-6": {
+          "candidate": "C-3"
+        },
+        "delivered/O-7": {
+          "candidate": "C-3"
+        },
+        "delivered/O-8": {
+          "candidate": "C-3"
+        },
+        "canceled/O-3": {
+          "candidate": "C-3"
+        },
+        "canceled/O-4": {
+          "candidate": "C-3"
+        },
+        "canceled/O-5": {
+          "candidate": "C-3"
+        },
+        "canceled/O-6": {
+          "candidate": "C-3"
+        },
+        "canceled/O-7": {
+          "candidate": "C-3"
+        },
+        "canceled/O-8": {
+          "candidate": "C-3"
+        },
+        "on_hold/O-3": {
+          "candidate": "C-3"
+        },
+        "on_hold/O-4": {
+          "candidate": "C-3"
+        },
+        "on_hold/O-5": {
+          "candidate": "C-3"
+        },
+        "on_hold/O-6": {
+          "candidate": "C-3"
+        },
+        "on_hold/O-7": {
+          "candidate": "C-3"
+        },
+        "on_hold/O-8": {
+          "candidate": "C-3"
+        },
+        "refund_pending/O-3": {
+          "candidate": "C-3"
+        },
+        "refund_pending/O-4": {
+          "candidate": "C-3"
+        },
+        "refund_pending/O-5": {
+          "candidate": "C-3"
+        },
+        "refund_pending/O-6": {
+          "candidate": "C-3"
+        },
+        "refund_pending/O-7": {
+          "candidate": "C-3"
+        },
+        "refund_pending/O-8": {
+          "candidate": "C-3"
+        }
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "id": "C-1",
+      "check": 1,
+      "label": "INCONSISTENCY",
+      "claim": "refund writes refund_pending, which is not in STATUS, so the order leaves the representable set",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 40,
+          "quote": "order.status = \"refund_pending\""
+        },
+        {
+          "file": "models.py",
+          "line": 6,
+          "quote": "STATUS = {"
+        }
+      ],
+      "refs": [
+        "T-5",
+        "O-7"
+      ],
+      "condition": null,
+      "question": null
+    },
+    {
+      "id": "C-2",
+      "check": 4,
+      "label": "INCONSISTENCY",
+      "claim": "in_review is declared and required for every payment, but no operator produces it",
+      "evidence": [
+        {
+          "file": "models.py",
+          "line": 9,
+          "quote": "\"in_review\","
+        },
+        {
+          "file": "operations.py",
+          "line": 27,
+          "quote": "order.status = \"paid\""
+        }
+      ],
+      "refs": [
+        "T-2"
+      ],
+      "condition": null,
+      "question": null
+    },
+    {
+      "id": "C-3",
+      "check": 3,
+      "label": "INCONSISTENCY",
+      "claim": "Status-changing operators never read the current state, so a shipped order can be canceled against the README rule",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 31,
+          "quote": "order.status = \"canceled\""
+        },
+        {
+          "file": "README.md",
+          "line": 11,
+          "quote": "A shipped order can"
+        }
+      ],
+      "refs": [
+        "T-3",
+        "O-5"
+      ],
+      "condition": null,
+      "question": null
+    },
+    {
+      "id": "C-4",
+      "check": 9,
+      "label": "INCONSISTENCY",
+      "claim": "hold stores held_from but nothing resumes an on_hold order, so paused orders are trapped",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 35,
+          "quote": "order.held_from = order.status"
+        }
+      ],
+      "refs": [
+        "T-4",
+        "O-6"
+      ],
+      "condition": null,
+      "question": null
+    },
+    {
+      "id": "C-5",
+      "check": 2,
+      "label": "AMBIGUITY",
+      "claim": "apply_discount treats values <= 1 as fractions and larger ones as amounts, while the README promises a percentage",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 14,
+          "quote": "if value <= 1:"
+        },
+        {
+          "file": "README.md",
+          "line": 24,
+          "quote": "Discounts are expressed as a **percentage** (0-100)"
+        }
+      ],
+      "refs": [
+        "O-2"
+      ],
+      "question": "Is a discount a percentage 0-100, a fraction 0-1, or a fixed amount, and what does 1 mean?",
+      "condition": null
+    },
+    {
+      "id": "C-6",
+      "check": 10,
+      "label": "INCONSISTENCY",
+      "claim": "The total is stored and also derivable from items; add_item and apply_discount change one without the other",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 15,
+          "quote": "order.total = order.total * (1 - value)"
+        },
+        {
+          "file": "models.py",
+          "line": 47,
+          "quote": "return sum(i.qty * i.price for i in order.items)"
+        }
+      ],
+      "refs": [
+        "O-1",
+        "O-2"
+      ],
+      "condition": null,
+      "question": null
+    },
+    {
+      "id": "C-7",
+      "check": 7,
+      "label": "RISK",
+      "claim": "A redelivered payment webhook appends the payment and adds its amount again",
+      "evidence": [
+        {
+          "file": "webhook.py",
+          "line": 9,
+          "quote": "order.payments.append(Payment(amount=event[\"amount\"], event_id=event[\"id\"]))"
+        }
+      ],
+      "refs": [
+        "O-10"
+      ],
+      "condition": "The provider retries the same event id after a timeout or a non-200 response, as the README says it does",
+      "question": null
+    },
+    {
+      "id": "C-8",
+      "check": 6,
+      "label": "RISK",
+      "claim": "ship decrements inventory before notifying the courier, so a courier failure leaves stock reserved for an order that never ships",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 44,
+          "quote": "inventory.reserve(order.items)"
+        },
+        {
+          "file": "operations.py",
+          "line": 45,
+          "quote": "# TODO: wrap in a transaction"
+        }
+      ],
+      "refs": [
+        "O-8"
+      ],
+      "condition": "courier.notify raises after inventory.reserve has succeeded",
+      "question": null
+    },
+    {
+      "id": "C-9",
+      "check": 4,
+      "label": "INCONSISTENCY",
+      "claim": "refund_pending has no outgoing transition and is not final, so refunded orders are absorbed",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 40,
+          "quote": "order.status = \"refund_pending\""
+        }
+      ],
+      "refs": [
+        "T-5"
+      ],
+      "condition": null,
+      "question": null
+    },
+    {
+      "id": "C-10",
+      "check": 1,
+      "label": "INCONSISTENCY",
+      "claim": "deliver may write delivered from a state where delivery is not allowed",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 54,
+          "quote": "order.status = \"delivered\""
+        }
+      ],
+      "refs": [
+        "T-7"
+      ],
+      "condition": null,
+      "question": null
+    }
+  ]
+}

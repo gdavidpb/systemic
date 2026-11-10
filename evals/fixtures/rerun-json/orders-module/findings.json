@@ -1,0 +1,43 @@
+{
+  "confirmed": [
+    {
+      "fingerprint": "operations.py:refund:closure:undeclared-state",
+      "candidate": "C-1",
+      "title": "refund() writes a status outside the system",
+      "label": "INCONSISTENCY",
+      "severity": "high",
+      "check": 1,
+      "root_cause": "refund assigns the literal 'refund_pending', which STATUS does not declare",
+      "manifestations": [],
+      "evidence": [
+        {"file": "operations.py", "line": 40, "quote": "order.status = \"refund_pending\""},
+        {"file": "models.py", "line": 6, "quote": "STATUS = {"}
+      ],
+      "condition": null,
+      "question": null,
+      "impact": {"demonstrated": "A refunded order holds a status no operation reads, exits or archives", "conditional": null, "not_verified": null},
+      "confidence": {"level": "high", "basis": "Direct source evidence plus a concrete trace through the operator"},
+      "recommendation": "Declare refund_pending with its exits, or route refunds through a declared state"
+    },
+    {
+      "fingerprint": "operations.py:deliver:completeness:no-guard",
+      "candidate": "C-2",
+      "title": "deliver() accepts any status",
+      "label": "RISK",
+      "severity": "high",
+      "check": 3,
+      "root_cause": "deliver writes delivered without reading the current status",
+      "manifestations": [],
+      "evidence": [
+        {"file": "operations.py", "line": 51, "quote": "order.status = \"delivered\""}
+      ],
+      "condition": "deliver is called on an order that has not been shipped",
+      "question": null,
+      "impact": {"demonstrated": "A draft order can be marked delivered without being paid or shipped", "conditional": null, "not_verified": null},
+      "confidence": {"level": "high", "basis": "Direct source evidence of the unguarded write"},
+      "recommendation": "Guard deliver so only shipped orders can be delivered"
+    }
+  ],
+  "rejected": [],
+  "merged": []
+}

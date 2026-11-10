@@ -323,6 +323,18 @@ itself a system, and this phase is its consistency check.
     implementations do not establish a shared root cause. When uncertain, try
     isolated repairs: if fixing one leaves the other reproducible, keep
     separate findings and explain their relationship.
+    **Missing guards on one machine.** When several operators write the
+    same machine's state without checking the current one, and the
+    allowed transitions are declared in one place (a README, a spec, an
+    enum with documented rules), the root cause is that the declared
+    machine is enforced nowhere: one transition function over the
+    declared table removes every hole at once. Report ONE finding, name
+    each operator and its worst consequence as a manifestation, and rate
+    it by the worst manifestation. Keep a separate finding when a guard
+    concerns a different machine, a rule outside the transition table (an
+    amount check, an ownership check), or a defect that remains after the
+    table exists (writing an undeclared state is closure, not a missing
+    guard).
   - **4d Severity and confidence.** Rate each surviving finding against the
     rubric below (the damage it causes, not the check's typical ceiling) and
     give it a fingerprint derived from its root cause.

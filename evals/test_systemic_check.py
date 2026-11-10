@@ -120,6 +120,13 @@ class G0Scope(GateTestCase):
         self.ws.edit("run.json", lambda d: d.update(profile="standard"))
         self.assertFails("G0", "00-scope.md")
 
+    def test_incomplete_run_may_name_a_missing_target(self):
+        self.ws.edit("run.json", lambda d: (d["targets"].append("payments.py"), d.update(
+            status="incomplete", phase="F1",
+            incomplete_reason="G0 fails: payments.py is a target and no longer exists; the user forbade rescoping")))
+        code, out = self.ws.check("all")
+        self.assertEqual(code, 0, out)
+
     def test_needs_scope_requires_a_proposal(self):
         self.ws.edit("run.json", lambda d: d.update(status="needs_scope", phase="F0", scope_proposal="tbd"))
         self.assertFails("G0", "scope_proposal")
@@ -273,6 +280,18 @@ class G5Tests(GateTestCase):
         code, out = self.ws.check("G5")
         self.assertIn("every finding is not_assessed", out)
         self.assertNotIn("records test files as read", out)
+
+    def test_concurrency_label_needs_an_interleaving(self):
+        self.ws.edit("tests.json", lambda d: d["tests"][2].update(technique="concurrency"))
+        self.assertFails("G5", "shows concurrency")
+
+    def test_fault_injection_label_needs_a_failure(self):
+        self.ws.edit("tests.json", lambda d: d["tests"][1].update(technique="fault_injection"))
+        self.assertFails("G5", "shows fault_injection")
+
+    def test_repetition_label_needs_a_repeated_operation(self):
+        self.ws.edit("tests.json", lambda d: d["tests"][5].update(technique="repetition"))
+        self.assertFails("G5", "never applies an operation twice")
 
     def test_test_ids_are_unique(self):
         self.ws.edit("tests.json", lambda d: d["tests"][1].update(id="X-1"))
@@ -486,6 +505,22 @@ class RunState(GateTestCase):
         self.ws.report.unlink()
         code, out = self.ws.check("all")
         self.assertEqual(code, 0, out)
+
+
+class InterruptedRun(unittest.TestCase):
+    """evals/fixtures/resume: a run interrupted at F5 whose source changed after F1."""
+
+    def test_resumed_run_must_return_to_f1(self):
+        run_dir = HERE / "fixtures" / "resume" / "systemic-out" / "orders-module"
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(checker.main(["G0", str(run_dir)]), 0)
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(checker.main(["all", str(run_dir)]), 1)
+        lines = out.getvalue().splitlines()
+        self.assertTrue(any(l.startswith("G1 ") and "sha256 does not match operations.py" in l for l in lines), lines)
+        self.assertFalse(any(l.startswith(("G5", "G6", "G7")) for l in lines), lines)
 
 
 if __name__ == "__main__":

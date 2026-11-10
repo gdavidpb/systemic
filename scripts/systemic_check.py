@@ -54,6 +54,40 @@ TECHNIQUE_FIT = {
     "algebraic": {"metamorphic", "property"},
 }
 SUITE_STATUS = {"in_scope", "absent", "out_of_scope"}
+# Techniques whose label must be visible in the test body. A test labeled with
+# one of these and showing none of its markers is relabeled by the auditor.
+TECHNIQUE_MARKERS = {
+    "concurrency": ("Barrier", "Event(", "Latch", "Semaphore", "Thread(", "threading.", "asyncio.gather",
+                    "gather(", "Promise.all", "go func", "WaitGroup", "interleav", "yield_now"),
+    "fault_injection": ("side_effect", "raise ", "throw ", "raises", "Raises", "fail", "Error(", "Exception(",
+                        "mock.patch", "patch(", "monkeypatch", "inject"),
+    "property": ("@given", "hypothesis", "fc.assert", "fc.property", "forall", "for ", "subTest", "product(",
+                 "parametrize", "quickcheck", "proptest", "each(", "range("),
+}
+TEST_START = re.compile(r"^(\s*)(?:async\s+)?(?:def |class |func Test|it\(|test\(|describe\(|@Test|fn )")
+
+
+def test_body(ctx, cite):
+    """The text of the test whose definition is cited, up to the next sibling definition."""
+    loaded = ctx.source_lines(cite.get("file")) if isinstance(cite, dict) else None
+    line = cite.get("line") if isinstance(cite, dict) else None
+    if loaded is None or not isinstance(line, int) or not 1 <= line <= len(loaded[1]):
+        return None
+    lines = loaded[1]
+    start = line - 1
+    for back in range(start, max(-1, start - 3), -1):
+        if TEST_START.match(lines[back]):
+            start = back
+            break
+    head = TEST_START.match(lines[start])
+    indent = len(head.group(1)) if head else len(lines[start]) - len(lines[start].lstrip())
+    body = [lines[start]]
+    for text in lines[start + 1:start + 120]:
+        match = TEST_START.match(text)
+        if match and len(match.group(1)) <= indent:
+            break
+        body.append(text)
+    return "\n".join(body)
 GAP_STATUS = {"detected", "undetected", "enshrined", "not_assessed"}
 FORBIDDEN_DIRS = {"node_modules", "vendor", ".git", "fixtures", "site-packages", ".venv", "venv"}
 FILLER = {"ok", "n/a", "na", "none", "-", "todo", "tbd", "yes", "no", "done", "checked", "fine", "verified"}
@@ -256,6 +290,8 @@ def g0(ctx):
     else:
         for i, target in enumerate(targets):
             if not isinstance(target, str) or not (ctx.source_root / target).exists():
+                if run.get("status") == "incomplete" and substantive(run.get("incomplete_reason")):
+                    continue  # the run stopped because its scope can no longer be met; the reason says so
                 e.append(f"G0 run.json.targets[{i}]: {target!r} does not exist under source_root")
     report = run.get("report_path")
     if not isinstance(report, str) or not report.endswith(".md"):
@@ -735,6 +771,20 @@ def g5(ctx):
             e.append(f"G5 {where}.name: required")
         if test.get("technique") not in TECHNIQUES:
             e.append(f"G5 {where}.technique: must be one of {sorted(TECHNIQUES)}")
+        markers = TECHNIQUE_MARKERS.get(test.get("technique"))
+        cites = test.get("evidence") if isinstance(test.get("evidence"), list) else []
+        if markers and cites:
+            body = test_body(ctx, cites[0])
+            if body is not None and not any(m in body for m in markers):
+                e.append(f"G5 {where}.technique: nothing in the body of {test.get('name')!r} shows "
+                         f"{test.get('technique')} (expected one of {list(markers)[:4]}…); classify it by what it does")
+        if test.get("technique") == "repetition" and cites:
+            body = test_body(ctx, cites[0])
+            calls = re.findall(r"([A-Za-z_][\w.]*)\(", body or "")
+            repeated = {c for c in calls if calls.count(c) > 1 and not c.startswith(("self.assert", "assert", "expect"))}
+            if body is not None and not repeated and not re.search(r"\bfor\b|range\(|times|repeat|twice|again", body):
+                e.append(f"G5 {where}.technique: {test.get('name')!r} never applies an operation twice; "
+                         f"it is not a repetition test")
         for ref in test.get("operators") or []:
             if ref not in operators:
                 e.append(f"G5 {where}.operators: unknown operator {ref}")

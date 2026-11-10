@@ -44,11 +44,12 @@ row here and the case that covers it.
 | Technique `property` | 16, 17 | — |
 | Technique `metamorphic` | 17 | — |
 | Technique `fault_injection` | 17 | — |
-| Technique `repetition` | 16 | — |
+| Technique `repetition` | 16 | `G5Tests` (label needs a repeated call) |
+| Technique labels match the test body | 17 | `G5Tests` (concurrency, fault injection) |
 | Trap: assertion on a mock | 17 | — |
 | Trap: snapshot of defective output | 17 | `StockReservations` |
 | Trap: `assertRaises(Exception)` | 17 | — |
-| Trap: concurrency without an interleaving | 17 | — |
+| Trap: concurrency without an interleaving | 17 | `G5Tests` |
 | Trap: setup that relies on a defect without asserting it | 15 | — |
 | Finding `detected` (a red test) | 17 | `FixtureSuites` |
 | Finding `enshrined` | 15, 17 | `G5Tests`, `FixtureSuites` |
@@ -69,6 +70,7 @@ row here and the case that covers it.
 | Refutation: guard in a decorator, dedup in middleware, guarding caller | 7, 12 | — |
 | Refutation does not hide recovery defects | 7, 11 | `AdversarialFixtures` |
 | Dedup: one finding per root cause | 1 | `G4Findings` |
+| Missing guards on one declared machine are one finding | 1 | — |
 | Independent causes stay separate | 7, 10 | `AdversarialFixtures` |
 | Severity by damage, not domain | 1, 10 | — |
 | Justified `critical` (scope, why unrecoverable) | 17 (sweep deletes sales) | `G4Findings` |
@@ -98,10 +100,12 @@ row here and the case that covers it.
 | `resolved` with evidence of the fix | 8, 14 | `G6Reaudit` |
 | `not_verified` antecedent | 9, 13 | `G6Reaudit` |
 | Mode change keeps the history | 13 | — |
-| Incomplete run discloses why | — | `G0Scope`, `RunState` |
-| Gates checked by hand without Python | — | — |
+| Resume an interrupted run from `run.json.phase` | 21 | `RunState` |
+| Source changed mid-run: explicit return to F1 | 21 | `InterruptedRun` |
+| Incomplete run discloses why | 23 | `G0Scope`, `RunState` |
+| Gates checked by hand without Python | 22 | — |
 | No artifact, HTML or server | 1, 2, 3 | `G7Report` (no HTML) |
 
-The last two rows are known gaps: an incomplete run and a run without Python
-cannot be induced reliably from a prompt, so they are covered only by the
-validator's own tests or not at all.
+Evals 21–23 induce the runs a prompt alone cannot: an interrupted run whose
+source changed, a machine without Python, and a scope that can no longer be
+satisfied. Their setup is in the `notes` of `evals.json`.

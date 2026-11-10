@@ -60,7 +60,7 @@ Conventions:
 | `phase` | the phase in progress, `F0`…`F8` |
 | `status` | `in_progress`, `needs_scope`, `complete`, `incomplete` |
 | `scope_proposal` *(text)* | required when `status` is `needs_scope` **[gate]** |
-| `incomplete_reason` *(text)* | required when `status` is `incomplete` **[gate]** |
+| `incomplete_reason` *(text)* | required when `status` is `incomplete` **[gate]**; an incomplete run may keep targets that no longer exist when its reason says so |
 | `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped", "detail"}]`; `skipped` records F6 when there is no previous report |
 
 **Re-audit setup.** When `systemic-out/<slug>.md` already exists and is a

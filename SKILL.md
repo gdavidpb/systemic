@@ -130,7 +130,9 @@ names one. A profile changes cost, never the evidence bar.
    whose gate failed, write the report with that reason in its first
    section, and close as F8 says. Log every gate result in `run.json.log`.
 4. **No Python.** If `python3` is not available, apply each gate as a
-   checklist against `references/run-contracts.md`, set
+   checklist against `references/run-contracts.md` (every **[gate]** rule,
+   including the counts and technique markers the validator would compute),
+   log each as `gate_passed` with `checked manually` in its detail, set
    `validation: "manual"`, and state in the report's scope section that the
    gates were checked manually.
 5. **Terminal states.** A run ends `complete` or `incomplete`. `needs_scope`
@@ -342,7 +344,12 @@ itself a system, and this phase is its consistency check.
     concerns a different machine, a rule outside the transition table (an
     amount check, an ownership check), or a defect that remains after the
     table exists (writing an undeclared state is closure, not a missing
-    guard).
+    guard). A hole that needs an operator that does not exist (a review
+    step nothing performs) belongs to the finding about that missing
+    operator. This rule is the isolated-repair test applied to a machine —
+    the shared repair is the transition function — so it wins over
+    keeping each operator separate. Record the finding under check 3 and
+    list the other checks among its manifestations.
   - **4d Severity and confidence.** Rate each surviving finding against the
     rubric below (the damage it causes, not the check's typical ceiling) and
     give it a fingerprint derived from its root cause.

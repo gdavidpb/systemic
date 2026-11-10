@@ -28,7 +28,7 @@
       "impact": {
         "demonstrated": "A refunded order holds a status no operation reads, exits or archives",
         "conditional": null,
-        "not_verified": null
+        "not_verified": "How often this happens in production and its external cost are not established by the module alone"
       },
       "confidence": {
         "level": "high",
@@ -62,7 +62,7 @@
       "impact": {
         "demonstrated": "Every payment bypasses the declared anti-fraud review",
         "conditional": null,
-        "not_verified": null
+        "not_verified": "How often this happens in production and its external cost are not established by the module alone"
       },
       "confidence": {
         "level": "high",
@@ -96,7 +96,7 @@
       "impact": {
         "demonstrated": "cancel turns a shipped order into canceled, which the README forbids",
         "conditional": null,
-        "not_verified": null
+        "not_verified": "How often this happens in production and its external cost are not established by the module alone"
       },
       "confidence": {
         "level": "high",
@@ -125,7 +125,7 @@
       "impact": {
         "demonstrated": "An order put on hold stays on_hold permanently",
         "conditional": null,
-        "not_verified": null
+        "not_verified": "How often this happens in production and its external cost are not established by the module alone"
       },
       "confidence": {
         "level": "high",
@@ -159,7 +159,7 @@
       "impact": {
         "demonstrated": "A discount of 1 removes the whole total while 2 subtracts two currency units",
         "conditional": null,
-        "not_verified": null
+        "not_verified": "How often this happens in production and its external cost are not established by the module alone"
       },
       "confidence": {
         "level": "high",
@@ -193,7 +193,7 @@
       "impact": {
         "demonstrated": "Adding an item after checkout leaves total lower than the sum of the items",
         "conditional": null,
-        "not_verified": null
+        "not_verified": "How often this happens in production and its external cost are not established by the module alone"
       },
       "confidence": {
         "level": "high",
@@ -256,7 +256,7 @@
       "impact": {
         "demonstrated": "If courier.notify raises, inventory stays reserved and the order is not shipped",
         "conditional": null,
-        "not_verified": null
+        "not_verified": "How often this happens in production and its external cost are not established by the module alone"
       },
       "confidence": {
         "level": "high",

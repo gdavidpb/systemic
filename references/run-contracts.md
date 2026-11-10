@@ -29,7 +29,10 @@ Conventions:
 - **IDs** are stable within a run: `D-n` declared claim, `S-n` system,
   `E-n` element, `O-n` operator, `M-n` machine, `T-n` transition,
   `V-n` divergence, `I-n` invariant, `C-n` candidate, `X-n` test.
-- **Citation**: `{"file": "<path>", "line": <n>, "quote": "<text>"}`.
+- **Citation**: `{"file": "<path>", "line": <n>, "quote": "<text>"}`. A
+  quote may span lines: the window `line - 2 … line + 2` is joined with
+  spaces and whitespace is collapsed before matching, so copy text
+  verbatim, without Markdown or escapes.
   `file` is exactly a `path` recorded in `sources.json` (relative to
   `source_root`). `quote` is copied from the file and must appear within
   `line ± 2` after whitespace normalization **[gate]**. `quote` is optional in
@@ -82,7 +85,9 @@ rest of the previous workspace, including any older `prior/`.
 }
 ```
 
-- `sha256` and `lines` describe the file as read **[gate]**. If a later phase
+- `sha256` and `lines` describe the file as read **[gate]**. `lines` is the
+  number of lines as Python's `splitlines()` counts them: `wc -l` plus one
+  when the file does not end with a newline. If a later phase
   finds a different hash, the source changed during the run: return to F1.
 - `read: "partial"` requires `ranges: [[start, end], …]`. A citation outside
   those ranges is rejected **[gate]**, so a partially read file cannot support
@@ -201,8 +206,11 @@ rest of the previous workspace, including any older `prior/`.
   `[a-z0-9._:/-]` **[gate]**. Derive it from the root cause, not from the
   title or the wording, so the same defect gets the same fingerprint on the
   next run. Unique within the run **[gate]**.
-- `root_cause`, `recommendation`, `impact.demonstrated` and `confidence.basis`
-  are *(text)* **[gate]**.
+- `root_cause`, `recommendation`, `impact.demonstrated`,
+  `impact.not_verified` and `confidence.basis` are *(text)* **[gate]**.
+  `not_verified` says what impact the material cannot establish (frequency,
+  deployment, external effect), or states that nothing beyond the
+  demonstrated effect is claimed.
 - `critical` requires `impact.scope` and `impact.unrecoverable_because`
   *(text)* **[gate]**: the rubric's amount or scope, and why recovery cannot
   contain it.
@@ -249,7 +257,18 @@ rest of the previous workspace, including any older `prior/`.
 - `tests`: unique `X-n`, a `name`, a `technique` among `example`,
   `sequence`, `property`, `stateful`, `repetition`, `concurrency`,
   `fault_injection`, `metamorphic`, modeled `operators`, and a quoted
-  citation in a `role: test` file **[gate]**.
+  citation in a `role: test` file **[gate]**. Cite the test's definition
+  line (or any line inside it): the validator reads the enclosing test body
+  and checks that some techniques are visible in it **[gate]**:
+  - `concurrency`: a primitive that forces overlap (`Barrier`, `Event(`,
+    `Latch`, `Semaphore`, `Thread(`, `threading.`, `gather(`,
+    `Promise.all`, `go func`, `WaitGroup`).
+  - `fault_injection`: a provoked failure (`side_effect`, `raise`,
+    `throw`, `raises`, `patch(`, `monkeypatch`, `Error(`, `Exception(`).
+  - `property`: a generator or a loop over a domain (`@given`,
+    `hypothesis`, `fc.property`, `for `, `range(`, `product(`, `subTest`,
+    `parametrize`).
+  - `repetition`: the same call twice, or a loop.
 - `coverage`: exactly one entry per invariant **[gate]**, with a `level`:
   - `asserted`: at least one test and a quoted citation of the assertion in a
     `role: test` file **[gate]**. For `temporal`, `repetition`,
@@ -273,7 +292,10 @@ rest of the previous workspace, including any older `prior/`.
   entry is `enshrined` **[gate]**.
 - `by_category` has the eight categories and equals the count the validator
   recomputes from `invariants` and `coverage` **[gate]**. Never write it by
-  hand: write `{}`, run G5 and copy the JSON it prints.
+  hand: write `{}`, run G5 and copy the JSON it prints. Without Python,
+  count it yourself: all eight categories in this order, each with
+  `total` (invariants of that category) and one count per level, zeros
+  included.
 
 ## `reaudit.json` — F6
 

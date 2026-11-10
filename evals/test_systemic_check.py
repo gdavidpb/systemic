@@ -307,6 +307,14 @@ class G5Tests(GateTestCase):
         self.ws.edit("tests.json", lambda d: d["tests"][5].update(technique="repetition"))
         self.assertFails("G5", "never applies an operation twice")
 
+    def test_technique_is_read_from_the_enclosing_test(self):
+        # Citing a line inside the test, not its def, still finds the whole body.
+        self.ws.edit("tests.json", lambda d: d["tests"][3].update(
+            technique="fault_injection",
+            evidence=[{"file": "test_orders.py", "line": 56, "quote": "deliver(order)"}]))
+        code, out = self.ws.check("G5")
+        self.assertEqual(code, 0, out)
+
     def test_test_ids_are_unique(self):
         self.ws.edit("tests.json", lambda d: d["tests"][1].update(id="X-1"))
         self.assertFails("G5", "must be a unique X-<n>")
@@ -369,6 +377,10 @@ class G4Findings(GateTestCase):
     def test_duplicate_fingerprint(self):
         self.ws.edit("findings.json", lambda d: d["confirmed"][1].update(fingerprint=d["confirmed"][0]["fingerprint"]))
         self.assertFails("G4", "duplicate")
+
+    def test_finding_states_what_impact_is_not_verified(self):
+        self.ws.edit("findings.json", lambda d: d["confirmed"][0]["impact"].update(not_verified=None))
+        self.assertFails("G4", "not_verified")
 
     def test_critical_requires_scope_and_irrecoverability(self):
         self.ws.edit("findings.json", lambda d: d["confirmed"][0].update(severity="critical"))

@@ -75,8 +75,11 @@ def test_body(ctx, cite):
         return None
     lines = loaded[1]
     start = line - 1
-    for back in range(start, max(-1, start - 3), -1):
-        if TEST_START.match(lines[back]):
+    cited = lines[start]
+    cited_indent = len(cited) - len(cited.lstrip())
+    for back in range(start, max(-1, start - 200), -1):
+        match = TEST_START.match(lines[back])
+        if match and (back == start or len(match.group(1)) < cited_indent):
             start = back
             break
     head = TEST_START.match(lines[start])
@@ -648,6 +651,7 @@ def g4(ctx):
             need_text(finding, "question", where, e, "G4")
         impact = finding.get("impact") or {}
         need_text(impact, "demonstrated", f"{where}.impact", e, "G4")
+        need_text(impact, "not_verified", f"{where}.impact", e, "G4")
         if finding.get("severity") == "critical":
             need_text(impact, "scope", f"{where}.impact", e, "G4")
             need_text(impact, "unrecoverable_because", f"{where}.impact", e, "G4")

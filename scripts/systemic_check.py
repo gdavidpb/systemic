@@ -597,7 +597,8 @@ def g3(ctx):
                     e.append(f"G3 {where}.rows.{state}: cell {cell!r} must be defined, guarded or hole")
                 if cell == "hole":
                     note = notes.get(f"{state}/{op}") or {}
-                    if note.get("candidate") not in candidates and not substantive(note.get("note")):
+                    named = [note.get("candidate")] + list(note.get("candidates") or [])
+                    if not any(c in candidates for c in named) and not substantive(note.get("note")):
                         e.append(f"G3 {where}: hole {state}/{op} needs a candidate or a note")
     check3 = next((c for c in checks if isinstance(c, dict) and c.get("id") == 3), {})
     if check3.get("verdict") != "not_verifiable":

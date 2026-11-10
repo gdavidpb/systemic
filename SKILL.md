@@ -109,8 +109,9 @@ names one. A profile changes cost, never the evidence bar.
 1. **Context firewall.** Each phase starts by reading its input files from the
    workspace, not by recalling earlier reasoning. This keeps the run correct
    across context compaction and lets an interrupted run resume at
-   `run.json.phase`. To resume, log a `resumed` event, then run
-   `systemic_check.py all <workspace>` before anything else: a source that
+   `run.json.phase`. To resume, log a `resumed` event under the phase in
+   `run.json`, then run `systemic_check.py all <workspace>` before anything
+   else, logging its result as one entry under the earliest failing phase: a source that
    changed since F1, or any earlier gate that no longer passes, sends the
    run back to the earliest failing phase as rule 2 says. Redo means
    rebuilding that phase's files from its inputs, keeping stable ids where
@@ -118,8 +119,12 @@ names one. A profile changes cost, never the evidence bar.
 2. **Single writer.** A phase writes only its own files and `run.json`. If a
    later phase discovers that an earlier output is wrong, go back explicitly:
    set `phase` to that phase, add a `returned_to` log entry with the reason,
-   delete the files of every later phase (they are stale), and redo it and
-   everything after it. Never patch an earlier file silently.
+   delete the files of every later phase (they are stale; deleting them is
+   part of the same run, not a fresh one), and redo it and everything after
+   it: rebuild each phase's files from its inputs rather than editing them
+   in place. In the quick profile, keep the `work.md` sections of the
+   phases before the one returned to and rewrite the rest. Never patch an
+   earlier file silently.
 3. **Gates.** After writing a phase's files, run
    `python3 <skill-dir>/scripts/systemic_check.py <gate> <workspace>`. Fix
    the reported violations inside the same phase and run it again, at most
@@ -397,7 +402,8 @@ the invariant is violated. Running code is not asserting it.
   6. **Findings against the suite.** Classify every confirmed finding as
      `detected`, `undetected` or `enshrined` (`not_assessed` when the suite
      is out of scope).
-  7. **Counts.** Leave `by_category` to the validator: write `{}`, run G5,
+  7. **Counts.** Write the phase log first (`05-tests.md`, or the F5
+     section of `work.md`). Then leave `by_category` to the validator: write `{}`, run G5,
      copy the JSON it reports as expected, run G5 again. That first, planned
      failure is logged as `gate_failed` but does not count toward the two
      corrections of the run protocol.

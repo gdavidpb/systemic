@@ -280,6 +280,12 @@ def g0(ctx):
             e.append("G0 prior/findings.json: format json requires the archived previous findings")
     if run.get("status") == "needs_scope":
         need_text(run, "scope_proposal", "run.json", e, "G0")
+        later = sorted(name for name in ("sources.json", "model.json", "checks.json", "findings.json",
+                                          "tests.json", "reaudit.json") if (ctx.run_dir / name).exists())
+        if later:
+            e.append(f"G0 run.json: a run paused at needs_scope writes nothing past F0, found {later}")
+        if isinstance(report, str) and (ctx.root / report).is_file() and run.get("prior_report") is None:
+            e.append("G0 run.json: a run paused at needs_scope does not write the report")
     if run.get("status") == "incomplete":
         need_text(run, "incomplete_reason", "run.json", e, "G0")
     need_log(ctx, "G0", e)

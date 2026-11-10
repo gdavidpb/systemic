@@ -136,10 +136,17 @@ Fix what is analyzed, how, and where it is delivered, before reading code.
 - **Inputs**: the user's request; the paths or document named;
   `graphify-out/graph.json` if it exists; the contents of `systemic-out/`.
 - **Work**:
-  1. If the scope is a large repo with no focus, propose narrowing to the
-     subsystem with the most state (state machines, lifecycles), set
-     `status: needs_scope` with a `scope_proposal`, and ask. That is where
-     systemic analysis pays off.
+  1. If the request names no lifecycle, module or path narrower than a
+     repository, and the repository holds more than one module or
+     subsystem, propose narrowing to the subsystem with the most state
+     (state machines, lifecycles), set `status: needs_scope` with a
+     `scope_proposal`, and ask — whatever the repository's size. That is
+     where systemic analysis pays off. To choose, you may read the graph
+     (step 2), READMEs and architecture documents and the directory
+     layout, but not the code. While paused, `slug` and `targets` describe
+     the request as given and the workspace holds only `run.json` and the
+     scope log. When the user answers, start F0 again with the new scope:
+     resolve its slug and workspace afresh and delete the paused one.
   2. If `graphify-out/graph.json` exists, read it BEFORE searching and use it
      to choose which modules to open: it maps files and their relations,
      which beats searching a large repo blind. It never replaces reading the

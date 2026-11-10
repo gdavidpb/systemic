@@ -124,6 +124,12 @@ class G0Scope(GateTestCase):
         self.ws.edit("run.json", lambda d: d.update(status="needs_scope", phase="F0", scope_proposal="tbd"))
         self.assertFails("G0", "scope_proposal")
 
+    def test_needs_scope_pause_writes_nothing_past_f0(self):
+        self.ws.edit("run.json", lambda d: d.update(
+            status="needs_scope", phase="F0",
+            scope_proposal="Narrow to the order lifecycle in operations.py, the only module with state"))
+        self.assertFails("G0", "writes nothing past F0")
+
     def test_needs_scope_pause_is_valid_before_any_phase_output(self):
         self.ws.edit("run.json", lambda d: d.update(
             status="needs_scope", phase="F0",

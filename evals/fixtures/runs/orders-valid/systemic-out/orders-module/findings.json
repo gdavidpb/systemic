@@ -1,0 +1,287 @@
+{
+  "confirmed": [
+    {
+      "fingerprint": "operations.py:refund:closure:undeclared-state",
+      "candidate": "C-1",
+      "title": "refund() writes a status outside the system",
+      "label": "INCONSISTENCY",
+      "severity": "high",
+      "check": 1,
+      "root_cause": "refund assigns the literal 'refund_pending', which STATUS does not declare",
+      "manifestations": [
+        "C-9: refund_pending is absorbing (check 4)"
+      ],
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 40,
+          "quote": "order.status = \"refund_pending\""
+        },
+        {
+          "file": "models.py",
+          "line": 6,
+          "quote": "STATUS = {"
+        }
+      ],
+      "condition": null,
+      "question": null,
+      "impact": {
+        "demonstrated": "A refunded order holds a status no operation reads, exits or archives",
+        "conditional": null,
+        "not_verified": null
+      },
+      "confidence": {
+        "level": "high",
+        "basis": "Direct source evidence plus a concrete trace through the operator"
+      },
+      "recommendation": "Declare refund_pending with its exits, or route refunds through a declared state"
+    },
+    {
+      "fingerprint": "models.py:status:reachability:in-review-unreachable",
+      "candidate": "C-2",
+      "title": "in_review is declared but nothing produces it",
+      "label": "INCONSISTENCY",
+      "severity": "medium",
+      "check": 4,
+      "root_cause": "No operator writes in_review; mark_paid skips the anti-fraud state",
+      "manifestations": [],
+      "evidence": [
+        {
+          "file": "models.py",
+          "line": 9,
+          "quote": "\"in_review\","
+        },
+        {
+          "file": "operations.py",
+          "line": 27,
+          "quote": "order.status = \"paid\""
+        }
+      ],
+      "condition": null,
+      "question": null,
+      "impact": {
+        "demonstrated": "Every payment bypasses the declared anti-fraud review",
+        "conditional": null,
+        "not_verified": null
+      },
+      "confidence": {
+        "level": "high",
+        "basis": "Direct source evidence plus a concrete trace through the operator"
+      },
+      "recommendation": "Add the operator that moves pending_payment to in_review and make mark_paid require it"
+    },
+    {
+      "fingerprint": "operations.py:status-writers:completeness:state-blind",
+      "candidate": "C-3",
+      "title": "Operators change status without checking the current state",
+      "label": "INCONSISTENCY",
+      "severity": "high",
+      "check": 3,
+      "root_cause": "Only deliver guards its source state; every other status write ignores the current state",
+      "manifestations": [],
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 31,
+          "quote": "order.status = \"canceled\""
+        },
+        {
+          "file": "README.md",
+          "line": 11,
+          "quote": "A shipped order can"
+        }
+      ],
+      "condition": null,
+      "question": null,
+      "impact": {
+        "demonstrated": "cancel turns a shipped order into canceled, which the README forbids",
+        "conditional": null,
+        "not_verified": null
+      },
+      "confidence": {
+        "level": "high",
+        "basis": "Direct source evidence plus a concrete trace through the operator"
+      },
+      "recommendation": "Introduce a single transition function with a declared transition table"
+    },
+    {
+      "fingerprint": "operations.py:hold:symmetry:no-resume",
+      "candidate": "C-4",
+      "title": "Paused orders can never resume",
+      "label": "INCONSISTENCY",
+      "severity": "high",
+      "check": 9,
+      "root_cause": "hold has no inverse operator that restores held_from",
+      "manifestations": [],
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 35,
+          "quote": "order.held_from = order.status"
+        }
+      ],
+      "condition": null,
+      "question": null,
+      "impact": {
+        "demonstrated": "An order put on hold stays on_hold permanently",
+        "conditional": null,
+        "not_verified": null
+      },
+      "confidence": {
+        "level": "high",
+        "basis": "Direct source evidence plus a concrete trace through the operator"
+      },
+      "recommendation": "Add resume() that restores held_from and clears it"
+    },
+    {
+      "fingerprint": "operations.py:apply_discount:ambiguity:value-unit",
+      "candidate": "C-5",
+      "title": "The discount unit depends on the value",
+      "label": "AMBIGUITY",
+      "severity": "medium",
+      "check": 2,
+      "root_cause": "apply_discount switches between fraction and amount at value 1, contradicting the percentage rule",
+      "manifestations": [],
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 14,
+          "quote": "if value <= 1:"
+        },
+        {
+          "file": "README.md",
+          "line": 24,
+          "quote": "Discounts are expressed as a **percentage** (0-100)"
+        }
+      ],
+      "condition": null,
+      "question": "Is a discount a percentage 0-100, a fraction 0-1, or a fixed amount, and what does 1 mean?",
+      "impact": {
+        "demonstrated": "A discount of 1 removes the whole total while 2 subtracts two currency units",
+        "conditional": null,
+        "not_verified": null
+      },
+      "confidence": {
+        "level": "high",
+        "basis": "Direct source evidence plus a concrete trace through the operator"
+      },
+      "recommendation": "Decide the unit, accept only that unit, and validate the range"
+    },
+    {
+      "fingerprint": "operations.py:total:minimal-expression:stored-and-derived",
+      "candidate": "C-6",
+      "title": "The stored total drifts from the items",
+      "label": "INCONSISTENCY",
+      "severity": "high",
+      "check": 10,
+      "root_cause": "total is materialized and also derivable from items, and writers update only one side",
+      "manifestations": [],
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 15,
+          "quote": "order.total = order.total * (1 - value)"
+        },
+        {
+          "file": "models.py",
+          "line": 47,
+          "quote": "return sum(i.qty * i.price for i in order.items)"
+        }
+      ],
+      "condition": null,
+      "question": null,
+      "impact": {
+        "demonstrated": "Adding an item after checkout leaves total lower than the sum of the items",
+        "conditional": null,
+        "not_verified": null
+      },
+      "confidence": {
+        "level": "high",
+        "basis": "Direct source evidence plus a concrete trace through the operator"
+      },
+      "recommendation": "Derive the total from items and store the discount separately"
+    },
+    {
+      "fingerprint": "webhook.py:handle_payment_webhook:idempotency:no-dedup",
+      "candidate": "C-7",
+      "title": "A retried payment webhook is counted twice",
+      "label": "RISK",
+      "severity": "high",
+      "check": 7,
+      "root_cause": "The handler appends and adds the amount without checking the event id",
+      "manifestations": [],
+      "evidence": [
+        {
+          "file": "webhook.py",
+          "line": 9,
+          "quote": "order.payments.append(Payment(amount=event[\"amount\"], event_id=event[\"id\"]))"
+        }
+      ],
+      "condition": "The provider retries the same event id after a timeout or a non-200 response, as the README says it does",
+      "question": null,
+      "impact": {
+        "demonstrated": "Delivering the same event twice doubles total_paid",
+        "conditional": null,
+        "not_verified": "How often the provider retries in production"
+      },
+      "confidence": {
+        "level": "high",
+        "basis": "Direct source evidence plus a concrete trace through the operator"
+      },
+      "recommendation": "Ignore events whose id is already recorded before changing totals"
+    },
+    {
+      "fingerprint": "operations.py:ship:partial-failure:not-atomic",
+      "candidate": "C-8",
+      "title": "A courier failure leaves inventory reserved",
+      "label": "RISK",
+      "severity": "high",
+      "check": 6,
+      "root_cause": "ship performs two side effects without a transaction or compensation",
+      "manifestations": [],
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 44,
+          "quote": "inventory.reserve(order.items)"
+        },
+        {
+          "file": "operations.py",
+          "line": 45,
+          "quote": "# TODO: wrap in a transaction"
+        }
+      ],
+      "condition": "courier.notify raises after inventory.reserve has succeeded",
+      "question": null,
+      "impact": {
+        "demonstrated": "If courier.notify raises, inventory stays reserved and the order is not shipped",
+        "conditional": null,
+        "not_verified": null
+      },
+      "confidence": {
+        "level": "high",
+        "basis": "Direct source evidence plus a concrete trace through the operator"
+      },
+      "recommendation": "Reserve and notify atomically, or release the reservation when notify fails"
+    }
+  ],
+  "rejected": [
+    {
+      "candidate": "C-10",
+      "reason": "deliver raises unless the order is shipped, so delivered is only written from shipped",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 52,
+          "quote": "if order.status != \"shipped\":"
+        }
+      ]
+    }
+  ],
+  "merged": [
+    {
+      "candidate": "C-9",
+      "into": "operations.py:refund:closure:undeclared-state"
+    }
+  ]
+}

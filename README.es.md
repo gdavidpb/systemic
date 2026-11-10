@@ -2,23 +2,21 @@
 
 *[Read this in English](README.md)*
 
-**Una skill de Claude Code que audita software como audita un sistema la
-Teoría General de Sistemas — con hallazgos funcionales por defecto y un
-reporte sistémico detallado cuando lo pides.**
+**Una skill de Claude Code que audita la consistencia del software con
+estado —ciclos de vida, workflows, sagas, cualquier cosa con una columna
+`status`— como la Teoría General de Sistemas audita un sistema.**
 
-La mayoría de los errores graves no son typos. Son violaciones de propiedades
-sistémicas: una operación que produce un estado que el sistema no puede
-representar, un operador sin inverso, un valor que está a la vez almacenado y
-derivado, un ciclo de vida cuyas reglas declaradas el código contradice.
-`systemic` modela tu solución como un sistema —elementos, operadores, máquinas
-de estados conceptuales— y verifica doce propiedades de consistencia contra
-él.
-
-Funciona sobre código, sobre documentos de diseño, o sobre ambos.
+Modela tu código o tu diseño como un sistema de elementos, operadores y
+máquinas de estados, verifica doce propiedades de consistencia y escribe un
+reporte en Markdown en tu disco. Cada hallazgo cita la línea en la que se
+apoya, ha sobrevivido a un intento de refutarlo y lo revisa un validador
+antes de que lo leas.
 
 ```
 /systemic analiza el ciclo de vida de pedidos en src/orders
 ```
+
+Funciona sobre código, sobre documentos de diseño, o sobre ambos.
 
 ---
 
@@ -51,9 +49,8 @@ def refund(order):
 
 El pedido queda fuera de toda operación que el sistema define. No es terminal,
 así que nada lo archiva. No está declarado, así que nada lo lee. Un linter ve
-una asignación de string. `systemic` detecta la violación de clausura internamente y reporta su
-consecuencia funcional por defecto; `full` también explica el diagnóstico
-sistémico.
+una asignación de string. `systemic` ve una violación de clausura y te dice
+qué les hace a tus pedidos.
 
 ## Instalación
 
@@ -64,19 +61,27 @@ como `systemic`:
 git clone https://github.com/gdavidpb/systemic ~/.claude/skills/systemic
 ```
 
-Eso es todo — Claude Code la toma de `~/.claude/skills/`. Para instalarla solo
-en un proyecto, clónala en `.claude/skills/systemic` dentro del repo.
+Claude Code la carga desde `~/.claude/skills/`. Para instalarla solo en un
+proyecto, clónala en `.claude/skills/systemic` dentro de tu repositorio.
 
-## Uso
+**Requisitos**
 
-Invócala por su nombre, o simplemente describe el problema — la skill se
-dispara por la intención, no por la palabra clave:
+- [Claude Code](https://claude.com/claude-code).
+- Python 3.9 o superior en la máquina donde corre Claude Code (recomendado).
+  La skill lo usa para ejecutar su validador, que solo necesita la biblioteca
+  estándar. Sin Python la ejecución funciona igual: las mismas comprobaciones
+  se aplican a mano y el reporte lo indica.
+
+## Inicio rápido
+
+Pídela por su nombre o describe el problema; la skill se activa por la
+intención, no por la palabra clave:
 
 ```
 /systemic audita el ciclo de vida de suscripciones en billing/
 ```
 ```
-¿Este diseño es consistente? [pega o apunta a un documento]
+¿Es consistente este diseño? docs/rental-design.md
 ```
 ```
 Encuentra contradicciones entre lo que promete el README y lo que hace el código.
@@ -85,254 +90,363 @@ Encuentra contradicciones entre lo que promete el README y lo que hace el códig
 Revisa mi máquina de estados — creo que hay transiciones que nadie maneja.
 ```
 
-Apúntala a una ruta, a un documento de diseño, o a ambos. Ante un repo grande
-sin foco, propondrá acotar al subsistema con más estado — que es donde el
-análisis rinde.
+Apúntala a una ruta, a un documento de diseño o a ambos. Al terminar recibes
+en el chat la ruta del reporte, un resumen breve y el hallazgo más grave. El
+reporte completo queda en `systemic-out/<alcance>.md` dentro de tu proyecto.
+
+Si la apuntas a un repositorio grande sin foco, propone el subsistema con más
+estado y espera tu respuesta antes de empezar.
+
+## Cómo funciona una ejecución
+
+Una ejecución pasa por ocho fases. Cada fase escribe sus resultados en disco
+y un validador los revisa antes de que empiece la siguiente. Nada de lo que
+dice el reporte puede venir de un paso que se saltó.
+
+```mermaid
+flowchart TD
+  REQ(["Tu solicitud"]) --> F0["F0 Encuadre"]
+  F0 --> G0{"puerta"}
+  G0 -- "sin foco claro" --> ASK(["Propone un alcance más acotado y pregunta"])
+  G0 --> F1["F1 Silueta: lee las fuentes y lo que prometen"]
+  F1 --> G1{"puerta"} --> F2["F2 Modelo: sistemas, operadores, máquinas de estados"]
+  F2 --> G2{"puerta"} --> F3["F3 Verificación: doce checks, hallazgos candidatos"]
+  F3 --> G3{"puerta"} --> F4["F4 Auditoría: releer, refutar, deduplicar, calificar"]
+  F4 --> G4{"puerta"} --> PR{"¿Reporte previo?"}
+  PR -- "sí" --> F5["F5 Reconciliación con el reporte previo"] --> G5{"puerta"} --> F6
+  PR -- "no" --> F6["F6 Reporte"]
+  F6 --> G6{"puerta"} --> F7(["F7 Fin: ruta, resumen, hallazgo principal"])
+  G4 -. "sigue fallando tras dos correcciones" .-> INC(["Incompleta: el reporte dice por qué"])
+```
+
+| Fase | Qué hace | Qué escribe | Qué la bloquea |
+|---|---|---|---|
+| F0 Encuadre | Fija qué se analiza, el modo de salida, el idioma y dónde va el reporte | `run.json` | Un alcance grande sin foco |
+| F1 Silueta | Lee cada archivo del alcance y lista lo que prometen la documentación, los docstrings y las constantes | `sources.json` | Un archivo del alcance que no se leyó ni se excluyó con motivo |
+| F2 Modelo | Describe los sistemas, operadores y máquinas de estados que el código realmente construye | `model.json` | Una transición que ningún operador ejecuta; un estado declarado ausente del modelo |
+| F3 Verificación | Aplica los doce checks; cada defecto sospechado se vuelve candidato | `checks.json` | Menos de doce veredictos; "clean" sin evidencia |
+| F4 Auditoría | Relee la evidencia de cada candidato, intenta refutarlo, fusiona duplicados, califica la severidad | `findings.json` | Una cita que no está en la línea indicada; un candidato sin resolver |
+| F5 Reconciliación | En una segunda ejecución, clasifica cada hallazgo anterior | `reaudit.json` | Un hallazgo anterior sin clasificar; "resolved" sin prueba de la corrección |
+| F6 Reporte | Escribe el reporte a partir de los registros | `systemic-out/<alcance>.md` | Conteos o severidades distintos de los registros |
+| F7 Fin | Confirma la ejecución y responde en el chat | — | — |
+
+**Por qué puedes confiar en el resultado.** Cada hallazgo tiene que pasar
+tres pruebas antes de llegarte. Su evidencia citada debe seguir en la línea
+indicada cuando el validador la busca. Un intento deliberado de refutarlo
+debe fallar: ¿está la guarda en un llamador, la deduplicación en un
+middleware, la ambigüedad resuelta dos secciones después? Y el reporte debe
+coincidir exactamente con los hallazgos registrados. El validador no puede
+saber si un diagnóstico es correcto —para eso está el paso de refutación—,
+pero garantiza que nada en el reporte quede sin cita, sin auditar o
+descartado en silencio.
+
+## Qué queda en tu disco
+
+```
+tu-proyecto/
+└── systemic-out/
+    ├── orders-module.md      ← el reporte: lee este
+    └── orders-module/        ← el espacio de trabajo de la ejecución
+        ├── run.json          alcance, modo, idioma, estado
+        ├── sources.json      archivos leídos, con hashes, y promesas declaradas
+        ├── model.json        sistemas, operadores, máquinas de estados
+        ├── checks.json       doce veredictos y hallazgos candidatos
+        ├── findings.json     candidatos confirmados, rechazados y fusionados
+        ├── reaudit.json      solo en una segunda ejecución
+        └── *.md / work.md    la bitácora de razonamiento de cada fase
+```
+
+- **El reporte** es el entregable. Es Markdown plano con referencias
+  `archivo:línea` relativas, así que puedes commitearlo, revisarlo en un pull
+  request o compartirlo.
+- **El espacio de trabajo** es lo que convierte la siguiente ejecución en una
+  re-auditoría, y te deja ver por qué se rechazó un candidato o de dónde salió
+  una severidad. Si una ejecución se interrumpe, se retoma desde ahí.
+- **Qué commitear.** Lo habitual es commitear, si acaso, el reporte, e
+  ignorar el espacio de trabajo: añade `systemic-out/*/` a tu `.gitignore`.
+  Borrar el espacio de trabajo es seguro; la siguiente ejecución sobre ese
+  alcance se trata entonces como una primera auditoría.
 
 ## Qué verifica
 
-Doce propiedades. Cuatro vienen directamente del marco sistémico; el resto
-aplican el mismo principio —la consistencia— a software real, con colas,
+Doce propiedades. Cuatro vienen directamente del marco de sistemas; el resto
+aplica el mismo principio —consistencia— al software que tiene colas,
 reintentos y concurrencia.
 
-| # | Verificación | La pregunta que hace |
+| # | Check | La pregunta que hace |
 |---|---|---|
 | 1 | **Clausura** | ¿Toda operación produce un estado que el sistema puede representar? |
-| 2 | **Ambigüedad de operador** | ¿Alguna operación admite dos interpretaciones razonables? |
-| 3 | **Completitud de transiciones** | Para cada par (estado, operador): ¿definida, prohibida, o un **hueco**? |
+| 2 | **Ambigüedad de operadores** | ¿Alguna operación admite dos interpretaciones razonables? |
+| 3 | **Completitud de transiciones** | Para cada par (estado, operador): ¿definido, prohibido, o un **hueco**? |
 | 4 | **Alcanzabilidad** | Estados que nada produce; estados de los que nada sale; transiciones muertas. |
 | 5 | **Estados ilegales representables** | ¿Puede el modelo persistir una combinación que el negocio prohíbe? |
-| 6 | **Invariantes y fallo parcial** | ¿Qué se rompe si el operador muere a medias, y quién lo repara? |
+| 6 | **Invariantes y fallo parcial** | ¿Qué se rompe si el operador muere a la mitad, y quién lo repara? |
 | 7 | **Idempotencia** | Clausura bajo repetición: ¿el reintento duplica el efecto? |
-| 8 | **Concurrencia** | Dos operadores sobre un elemento: ¿conmutan, se serializan, o se pisan? |
+| 8 | **Concurrencia** | ¿Dos operadores sobre un elemento conmutan, se serializan o se pisan? |
 | 9 | **Simetría** | Abrir sin cerrar, bloquear sin liberar, pausar sin reanudar. |
 | 10 | **Expresión mínima** | Un valor almacenado y derivado a la vez: dos fuentes de verdad que divergen. |
 | 11 | **Límites del sistema** | Requisitos fuera del conjunto representable — los hacks son la evidencia. |
-| 12 | **Bucles de retroalimentación** | Reintentos que alimentan colas que alimentan reintentos, sin amortiguador. |
+| 12 | **Lazos de retroalimentación** | Reintentos que alimentan colas que alimentan reintentos, sin amortiguador. |
 
-Aplica las que tu material permite verificar honestamente, y declara cuáles no
-aplicaron y por qué.
+Cada check recibe un veredicto en cada ejecución: **findings**, **clean** (con
+lo que se verificó) o **not verifiable** (con lo que faltó). El material
+faltante nunca se reporta como limpio.
 
-## Qué obtienes
+## Modos de salida
 
-Un archivo Markdown en tu disco — `systemic-out/<alcance>.md` — con dos modos
-de salida. **`functional` es el predeterminado; `full` conserva el formato
-sistémico detallado.** Ambos realizan el mismo modelado, las doce
-comprobaciones, la revisión de evidencia y la refutación. Cambia la explicación
-que recibe el lector.
+**`functional` es el modo por defecto; `full` añade el detalle sistémico.**
+Ambos ejecutan las mismas ocho fases sobre la misma evidencia. Solo cambia el
+reporte.
 
-| Contenido | `functional` (predeterminado) | `full` |
+| Contenido | `functional` (por defecto) | `full` |
 |---|---|---|
-| Qué falla, cuándo ocurre y su impacto funcional | Sí, en lenguaje cotidiano | Sí, con diagnóstico sistémico |
+| Qué falla, cuándo y su impacto funcional | Sí, en lenguaje cotidiano | Sí, con diagnóstico sistémico |
 | Evidencia, severidad, confianza y acción correctiva | Sí | Sí |
-| Historial de reauditoría y comportamiento no verificado | Sí | Sí |
-| Sistemas, objetivos, elementos y operadores | Solo en el análisis interno | Inventario en el reporte |
-| Diagramas de estados y matrices estado × operador | Solo en el análisis interno | Incluidos cuando aplican |
-| Teoría TGS y diagnóstico por número de comprobación | Se omiten | Se incluyen |
-| Cobertura de las doce comprobaciones | Se realiza internamente; se reportan límites relevantes | Tabla completa de veredictos |
+| Historial de re-auditoría y comportamiento no verificado | Sí | Sí |
+| Sistemas, elementos y operadores | Solo en el espacio de trabajo | En el reporte |
+| Diagramas de estados y matrices estado × operador | Solo en el espacio de trabajo | En el reporte |
+| Teoría GST y el check detrás de cada hallazgo | Omitido | Incluido |
+| Cobertura de los doce checks | En el espacio de trabajo; límites materiales en el reporte | Tabla completa de veredictos |
 
-### Elegir el modo de salida
+Elígelo con palabras; no son flags de CLI:
 
 ```text
-/systemic audita el ciclo de pedidos en src/orders
-/systemic audita el ciclo de pedidos en src/orders, output functional
-/systemic audita el ciclo de pedidos en src/orders, output full
+/systemic audita el ciclo de vida de pedidos en src/orders
+/systemic audita el ciclo de vida de pedidos en src/orders, salida full
 ```
 
-Los dos primeros generan `functional`; el tercero genera `full`. Son
-peticiones en lenguaje natural a la skill, no flags de una CLI. Pedir una
-auditoría profunda o sistémica, sin elegir formato, no activa `full`.
+El primero produce `functional`, el segundo `full`. Pedir una auditoría
+exhaustiva o sistémica no selecciona `full` por sí solo, y el modo de un
+reporte anterior no se hereda.
 
-En `functional`, el hallazgo explica que reintentar un reembolso puede
-registrarlo dos veces, qué operación resulta afectada, bajo qué condición y
-qué corregir. No enseña clausura ni teoría de operadores. Conserva evidencia
-y consecuencias no verificadas; no oculta problemas independientes para
-acortar el reporte.
+## Cómo leer un hallazgo
 
-En `full`, el mismo hallazgo también nombra la propiedad sistémica violada,
-muestra el ciclo de vida y aporta la tabla completa de cobertura.
-Cambiar de modo no reinicia el historial de reauditoría del alcance.
-
-### Cada hallazgo lleva una etiqueta de honestidad
+Cada hallazgo lleva una etiqueta de honestidad:
 
 | Etiqueta | Significa |
 |---|---|
-| `INCONSISTENCY` | Una contradicción **demostrada** con evidencia. El sistema hace X y también no-X. |
-| `RISK` | Se rompe bajo una condición concreta y enunciada — la condición queda escrita. |
-| `AMBIGUITY` | Subespecificado. La skill **no adivina**: enuncia la pregunta que tu arquitecto o dueño de producto tiene que responder. |
+| `INCONSISTENCY` | Una contradicción **probada** con evidencia. El sistema hace X y también no-X. |
+| `RISK` | Se rompe bajo una condición plausible y explícita — la condición queda escrita. |
+| `AMBIGUITY` | Subespecificado. La skill **no** adivina; formula la pregunta que tu arquitecto o product owner tiene que responder. |
 
-La severidad es `critical` / `high` / `medium` / `low`, calibrada por el daño
-que el hallazgo realmente causa. Critical requiere evidencia de pérdida
-material grave, irreversibilidad o corrupción persistente de impacto grave;
-el dominio monetario o un valor inválido no bastan. El reporte separa impacto
-y confianza, e identifica el impacto que no pudo verificarse.
+La severidad es `critical` / `high` / `medium` / `low`, según el daño que el
+hallazgo causa de verdad. Critical exige una pérdida material grave,
+irreversibilidad o corrupción persistente con impacto grave, todo sustentado;
+un dominio monetario o un valor inválido no bastan. La **confianza** (high /
+medium / low) es independiente de la severidad: dice qué tan sustentado está
+el diagnóstico, no qué tan grave es.
 
-Las etiquetas y severidades se mantienen en inglés en todos los idiomas, a
-propósito: son un enum, no prosa, y así los reportes siguen siendo comparables
-entre proyectos e idiomas.
+Un hallazgo `functional` se ve así:
 
-**La regla de honestidad no es negociable**: ningún hallazgo sin evidencia
-efectivamente leída. Toda afirmación cita `archivo:línea` o una sección del
-documento. Lo que no se puede evidenciar, no se reporta.
+```markdown
+### [high] [RISK] Un webhook de pago reintentado se cuenta dos veces
+- **Qué pasa y cuándo**: cuando el proveedor reenvía el mismo evento, el pago
+  se registra de nuevo y el monto se suma por segunda vez.
+- **Impacto funcional**: total_paid supera lo que pagó el cliente; un pedido
+  puede marcarse como pagado gracias a un duplicado.
+- **Evidencia y confianza**: `webhook.py:9`, `webhook.py:10`; alta, evidencia
+  directa en el código más la traza de una segunda entrega.
+- **Acción recomendada**: ignorar los eventos cuyo id ya esté registrado antes
+  de modificar cualquier total.
+```
 
-### Los hallazgos se auditan antes de reportarse
+El resumen siempre abre con una línea de conteo como
+`critical: 0 · high: 6 · medium: 2 · low: 0`. Las etiquetas, las severidades
+y las palabras clave de los conteos se mantienen en inglés en todos los
+idiomas, para que los reportes sigan siendo comparables y buscables con grep
+entre proyectos.
 
-Todo hallazgo borrador pasa tres compuertas. Su evidencia se **relee** en la
-ubicación citada. Se intenta activamente una **refutación** — ¿la guarda está
-en el caller? ¿el dedup en un middleware? ¿la ambigüedad se resuelve dos
-secciones después? Los candidatos rechazados conservan evidencia de
-refutación en el análisis. `full` los lista; `functional` los menciona cuando
-afectan una decisión práctica. Los hallazgos se **deduplican por causa
-raíz**: un hallazgo por defecto, sin importar cuántos checks dispare ni en
-cuántos call sites se repita.
-Compartir recomendación no fusiona defectos independientes: si una reparación
-aislada deja la otra falla reproducible, son puntos de corrección separados.
-La presencia de middleware se verifica en rutas de fallo y también de éxito.
+## Re-auditorías
 
-Córrela dos veces y el segundo reporte es una re-auditoría: cada hallazgo
-clasificado como **nuevo**, **persistente**, **resuelto** o **no verificado**
-contra la corrida anterior. Resolver exige evidencia actual de corrección o
-un cambio explícito de contrato; trasladar código a un servicio no disponible
-deja un antecedente no verificado. Se reportan los cuatro conteos, incluidos
-los ceros.
+Ejecútala otra vez sobre el mismo alcance y el segundo reporte es una
+re-auditoría. Cada hallazgo anterior queda clasificado y se reportan los
+cuatro conteos, incluidos los ceros:
 
-## Un ejemplo en modo full
+- **new** — encontrado ahora, ausente antes.
+- **persisting** — la misma causa raíz, re-verificada contra el código de hoy
+  en lugar de copiada.
+- **resolved** — la evidencia actual muestra la corrección, o un cambio
+  explícito de contrato hace inaplicable el requisito anterior. Un archivo
+  movido o un número de línea obsoleto no son una corrección.
+- **not verified** — no se puede confirmar ni descartar con el material del
+  alcance, por ejemplo porque el comportamiento pasó a un servicio que no
+  incluiste. El reporte conserva su última evidencia y dice qué haría falta
+  para verificarlo. No cuenta como hallazgo actual.
 
-Corrida contra un módulo de pedidos deliberadamente roto
-([`evals/fixtures/orders/`](evals/fixtures/orders/)), el reporte `full` lee la
-matriz así:
+Los hallazgos se emparejan por una huella (*fingerprint*) derivada de su causa
+raíz, así que cambiar un título no rompe el historial. Los reportes escritos
+antes de esta versión no tienen espacio de trabajo; aun así se reconocen y se
+reconcilian a partir del Markdown. Cambiar el modo de salida no reinicia el
+historial.
 
-> De 56 celdas de la matriz estado × operador, **una sola columna** está
-> correctamente cerrada (`deliver`) y **43 son huecos**. `add_item` y
-> `apply_discount` no aparecen porque son ciegas al estado: mutan un pedido
-> `delivered` igual que uno `draft`.
->
-> La función `is_final()` existe y **ningún operador la llama**. El sistema
-> declara la noción de estado final y no la usa.
+## Perfiles de ejecución y costo
 
-Y cierra nombrando la única pieza faltante que disuelve nueve de los catorce
-hallazgos de golpe:
+El pensamiento sistémico no es gratis. Una ejecución lee cada archivo del
+alcance, construye un modelo y audita cada candidato, así que tarda más y usa
+más tokens que una revisión de código. La skill elige un perfil según el
+tamaño del alcance:
 
-> Cada operación escribe `order.status` directamente. Eso significa que la
-> máquina de estados **no está implementada en ninguna parte** — existe como
-> prosa en el README y como conjunto de strings en `models.py`, pero ningún
-> componente la hace cumplir. El equipo está cortando la madera: cada operador
-> talla su transición a mano, y por eso cada uno puede tallarla mal de una
-> manera distinta.
+- **quick** — unos seis archivos o menos, o un único ciclo de vida. Los
+  mismos registros y puertas; el razonamiento va a una sola bitácora
+  `work.md`.
+- **standard** — alcances mayores. Una bitácora por fase. Cuando el entorno
+  admite subagentes y hay muchos candidatos, un verificador independiente
+  que nunca vio el modelado audita la evidencia.
 
-Esa es la diferencia con un code review. Un review dice *falta un guard en la
-línea 30*. Esto dice *la máquina no está implementada, aquí está la pieza, y
-estos son los nueve hallazgos que hace desaparecer*.
+Puedes pedir uno: "…, usa el perfil quick". Los perfiles cambian el costo,
+nunca la evidencia exigida.
 
-## Qué no es
+## Cuando una ejecución no termina
 
-- **No es un linter.** Lee significado, no patrones. No va a encontrar tus
-  imports sin usar, y sí va a encontrar que tu README prohíbe lo que tu código
-  permite.
-- **No es un escáner de seguridad.** Usa uno; son complementarios.
-- **No es gratis.** El pensamiento sistémico es caro y no apunta a apps
-  triviales. Apunta a sistemas con estado real —ciclos de vida, workflows,
-  sagas, cualquier cosa con una columna `status`— donde una inconsistencia
-  cuesta dinero. El reporte refleja ese criterio y recomienda componentes
-  nuevos solo cuando el beneficio los justifica.
+- **Te pide acotar el alcance.** El objetivo era un repositorio grande sin
+  foco. Responde con el módulo o ciclo de vida que te interesa; normalmente
+  propone el que tiene más estado.
+- **El reporte dice que la ejecución está incompleta.** Una fase siguió
+  fallando su validación tras dos correcciones; lo típico es que un archivo
+  del alcance cambiara durante la ejecución, o que el material no permita
+  construir un registro obligatorio. La primera sección del reporte nombra la
+  fase y el motivo. Corrige la causa (deja de editar los archivos del alcance,
+  añade los archivos que faltan) y vuelve a ejecutarla.
+- **"Puertas verificadas manualmente".** No había Python disponible. La
+  ejecución es válida, pero las comprobaciones deterministas las aplicó el
+  modelo en lugar del validador. Instala Python 3.9+ para tener las
+  comprobaciones automáticas.
+
+Puedes ejecutar el validador tú mismo en cualquier momento:
+
+```sh
+python3 ~/.claude/skills/systemic/scripts/systemic_check.py all systemic-out/orders-module
+```
 
 ## Idioma
 
 El reporte se escribe en el idioma que pidas. Si nombras uno, gana; si no,
-sigue el idioma en que estés escribiendo. Solo las etiquetas de honestidad y
-las severidades se mantienen como keywords fijos.
+sigue el idioma en el que escribes. Solo las palabras clave fijas
+—etiquetas, severidades, palabras de conteo y veredictos de cobertura— se
+mantienen en inglés.
 
-## Estructura
+## Qué no es
+
+- **No es un linter.** Lee por significado, no por patrones. No encontrará
+  tus imports sin usar, y sí encontrará que tu README prohíbe lo que tu código
+  permite.
+- **No es un escáner de seguridad.** Usa uno; son complementarios.
+- **No es para apps triviales.** Apunta a sistemas con estado real —ciclos de
+  vida, workflows, sagas, cualquier cosa con una columna `status`— donde una
+  inconsistencia cuesta dinero. El reporte recomienda componentes nuevos solo
+  cuando el beneficio los justifica.
+
+## Un ejemplo en modo full
+
+Ejecutada contra un módulo de pedidos deliberadamente roto ([`evals/fixtures/orders/`](evals/fixtures/orders/)),
+el reporte `full` lee la matriz así:
+
+> De 56 celdas de la matriz estado × operador, **una columna** está bien
+> cerrada (`deliver`) y **43 son huecos**. `add_item` y `apply_discount` no
+> aparecen porque son ciegos al estado: mutan un pedido `delivered` igual que
+> uno `draft`.
+>
+> La función `is_final()` existe y **ningún operador la llama**. El sistema
+> declara la noción de estado final y nunca la usa.
+
+Y cierra nombrando la pieza faltante que disuelve la mayoría de los hallazgos
+de una vez:
+
+> Cada operación escribe `order.status` directamente. Eso significa que la
+> máquina de estados **no está implementada en ninguna parte** — existe como
+> prosa en el README y como un conjunto de strings en `models.py`, pero ningún
+> componente la hace cumplir. El equipo está cortando la madera: cada operador
+> talla su propia transición a mano, y por eso cada uno puede tallarla mal de
+> una manera distinta.
+
+Esa es la diferencia con una revisión de código. Una revisión dice *falta una
+guarda en la línea 30*. Esto dice *la máquina no está implementada, esta es la
+pieza, y estos son los hallazgos que hace desaparecer*.
+
+Una ejecución de ejemplo completa y validada —reporte y espacio de trabajo—
+está en
+[`evals/fixtures/runs/orders-valid/systemic-out/`](evals/fixtures/runs/orders-valid/systemic-out/).
+
+## Estructura del repositorio
 
 ```
-SKILL.md                      análisis compartido, modos y reglas
+SKILL.md                      las ocho fases, reglas compartidas, etiquetas y severidad
 references/
-  gst-framework.md            el vocabulario conceptual, se lee antes de la fase 1
-  checks.md                   cómo detectar cada uno de los 12, se lee en la fase 2
-  output-functional.md        formato funcional (predeterminado)
-  output-full.md              formato sistémico detallado
+  run-contracts.md            la forma exacta de cada archivo que escribe una ejecución
+  gst-framework.md            el vocabulario conceptual (se lee en F2)
+  checks.md                   cómo detectar cada uno de los doce checks (se lee en F3)
+  output-functional.md        formato del reporte functional (por defecto)
+  output-full.md              formato del reporte sistémico detallado
+scripts/
+  systemic_check.py           el validador de puertas (Python 3.9+, biblioteca estándar)
 evals/
-  evals.json                  13 evals con aserciones
-  fixtures/orders/            módulo de código con 9 defectos sembrados
-  fixtures/rental-doc/        documento de diseño con 7 defectos sembrados
-  fixtures/booking-saga/      saga con compensaciones: fallo parcial y bucles
-  fixtures/clean-ticket/      ciclo de vida correcto: control de falsos positivos
-  fixtures/guarded-elsewhere/ defensas reales y defectos de refund/recuperación
-  fixtures/rerun/             un reporte previo: siembra la eval de re-auditoría
-  fixtures/rerun-external/    sucesor ausente: re-auditoría no verificada
-  fixtures/independent-ledgers/ causas separadas e impacto acotado
-  test_adversarial_fixtures.py contraejemplos ejecutables de las fixtures
+  evals.json                  14 evals de ejecución con aserciones
+  test_systemic_check.py      tests del validador: una violación de contrato por test
+  test_adversarial_fixtures.py contraejemplos ejecutables de los fixtures
+  fixtures/orders/            un módulo de código con defectos sembrados
+  fixtures/rental-doc/        un documento de diseño con fallas sembradas
+  fixtures/booking-saga/      una saga con compensaciones: fallo parcial y lazos
+  fixtures/clean-ticket/      un ciclo de vida correcto: el control de falsos positivos
+  fixtures/guarded-elsewhere/ caminos defendidos más defectos de reembolso y recuperación
+  fixtures/independent-ledgers/ causas independientes e impacto acotado
+  fixtures/rerun/             un reporte previo solo en Markdown (re-auditoría legacy)
+  fixtures/rerun-external/    un sucesor ausente: re-auditoría no verificada
+  fixtures/rerun-json/        una ejecución previa con findings.json (re-auditoría por huella)
+  fixtures/runs/orders-valid/ una ejecución válida completa: el caso de referencia del validador
 ```
 
-## Evals
+## Evals y tests
 
-`evals/evals.json` tiene trece casos con aserciones explícitas:
+Hay dos tipos de pruebas.
 
-1. **seeded-defects-code** — 9 defectos sembrados en un módulo Python.
-2. **design-doc-only** — un documento de diseño sin código; verifica que la
-   skill cite solo secciones del documento y no invente rutas de código.
-3. **real-repo-lifecycle** — plantilla; aporta tu propio repo y ciclo de vida.
-4. **explicit-report-language** — prompt en español pidiendo reporte en
-   inglés; verifica que la petición explícita gane y las etiquetas no se
-   traduzcan.
-5. **saga-compensations-and-loops** — una saga con compensaciones; ejercita
-   los checks 6 y 12, incluido el timeout condicional sin inventar una
-   distribución de latencias.
-6. **clean-code-no-false-positives** — un módulo deliberadamente correcto.
-   Todas las demás fixtures premian encontrar cosas; ésta se califica por lo
-   que la skill **no** reporta. Una corrida que «encuentra más» aquí es una
-   corrida peor.
-7. **guarded-elsewhere-refutation** — cuatro defectos aparentes, cada uno
-   defendido en otra capa (un decorator, un middleware, un caller que guarda,
-   un total sincronizado). Rechaza falsas ausencias de defensas y detecta causas
-   independientes de replay de refund, elegibilidad y recuperación de pagos
-   fallidos, además de deriva condicionada por líneas mutables retenidas.
-   Se permiten hallazgos adicionales respaldados por evidencia.
-8. **re-audit-diff** — una segunda corrida sobre el módulo de pedidos con un
-   reporte previo presente; verifica que los hallazgos salgan clasificados
-   como nuevo / persistente / resuelto / no verificado, exigiendo evidencia
-   positiva para resolver.
-9. **re-audit-unavailable-successor** — comportamiento trasladado a un servicio
-   externo no disponible: el antecedente queda no verificado, no resuelto.
-10. **independent-causes-and-bounded-impact** — defectos independientes en dos
-   saldos, un snapshot histórico correcto y severidad acorde al impacto
-   demostrado. Una recomendación similar no fusiona causas independientes.
-
-11. **default-functional-output** — sin modo explícito: impacto funcional,
-    evidencia y acciones, sin teoría ni artefactos de modelado.
-12. **explicit-full-output** — selecciona el formato detallado sobre las mismas
-    facturas, conservando sus hallazgos funcionales.
-13. **functional-re-audit-from-full** — un reporte full anterior no cambia el
-    modo predeterminado ni borra un antecedente no verificable.
-
-Sustituye `<SKILL_DIR>` por la ruta absoluta de la skill al correrlas.
-Las evals 8, 9 y 13 requieren sembrar primero su reporte previo en el directorio
-aislado de trabajo; el setup está documentado en `evals/evals.json`. Los casos
-1–10 piden `full`; los casos 11–13 ejercitan la selección y el historial entre
-modos.
-
-Ejecuta los contraejemplos de las fixtures con:
+**Tests deterministas**, que solo necesitan Python:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -v
 ```
 
-Estas pruebas verifican las trazas causales de las fixtures; no califican un
-reporte del modelo. Valida el skill con ejecuciones aisladas contra las
-aserciones de cada caso.
+`test_systemic_check.py` copia la ejecución de referencia, rompe un contrato
+por test —un veredicto que falta, una cita desplazada de su línea, un
+hallazgo critical sin su justificación, un conteo del reporte que no coincide
+con los registros— y comprueba que la puerta correcta lo rechaza.
+`test_adversarial_fixtures.py` ejecuta los defectos sembrados en los
+fixtures, de modo que la verdad de referencia de las evals también está
+probada.
+
+**Evals de ejecución** (`evals/evals.json`): ejecutan la skill sobre un
+fixture y califican el reporte y el espacio de trabajo contra aserciones
+escritas. Para correr una: copia la skill a una ubicación aislada, sustituye
+`<SKILL_DIR>` en el prompt por su ruta absoluta, ejecuta el prompt desde un
+directorio de trabajo vacío y revisa cada aserción. Las evals 8, 9, 13 y 14
+necesitan sembrar antes un reporte previo; la preparación está en el campo
+`notes` de `evals.json`. Los casos 1–10 y 14 piden `full`; los 11–13
+ejercitan la selección de modo y el historial entre modos.
 
 Las evals 6 y 7 son las que más importan a medida que la skill cambia. Una
-herramienta que reporta problemas vale lo que valga su tasa de falsos
-positivos, y todas las demás evals empujan hacia reportar más. La 6 mide
-contención — no encontrar nada donde no hay nada; la 7 mide discriminación —
-rechazar cuatro trampas defendidas sin quedar ciega al defecto de al lado.
+herramienta que reporta problemas vale lo que vale su tasa de falsos
+positivos, y todas las demás evals empujan hacia reportar más. La eval 6 mide
+la contención —no encontrar nada donde no hay nada mal—. La eval 7 mide la
+discriminación —rechazar cuatro trampas defendidas sin quedarse ciega ante
+los defectos de al lado—.
 
 ## Contribuir
 
 Las contribuciones más útiles son **fixtures**: un ciclo de vida con un
-defecto que la skill no encuentre, más la aserción que debería haberlo
-atrapado. Un check que nunca dispara sobre ninguna fixture es un check en el
-que nadie puede confiar.
+defecto que la skill no detecta, más la aserción que debió atraparlo. Un
+check que nunca se dispara en ningún fixture es un check en el que nadie
+puede confiar.
+
+Otras contribuciones valiosas:
+
+- **Una regla del validador** para un contrato que se pueda comprobar
+  mecánicamente. Añádela a `scripts/systemic_check.py`, documéntala en
+  `references/run-contracts.md` y añade un test de mutación que demuestre que
+  se dispara.
+- **Un test de contraejemplo** en `test_adversarial_fixtures.py` para el
+  defecto sembrado de un fixture nuevo.
+
+Mantén `README.md` y `README.es.md` sincronizados: un cambio en uno debe
+llegar también al otro.
 
 ## Licencia
 

@@ -1,5 +1,7 @@
 # Reports produced by the skill itself
 systemic-out/
+# ...except the golden run workspaces used by the validator tests
+!/evals/fixtures/**/systemic-out/
 
 # macOS
 .DS_Store

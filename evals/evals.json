@@ -1,6 +1,6 @@
 {
   "skill_name": "systemic",
-  "notes": "Evals 1, 2, 4, 5, 6, 7, 9 and 10 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1; 5 targets partial failure and loops; 6 is the clean false-positive control; 7 distinguishes actual defenses from independent refund and failed-payment recovery defects; 9 tests an unverified re-audit antecedent; 10 tests independent root causes, historical snapshots and impact-based severity). Evals 8 and 9 need setup: copy their previous-orders-module.md to <working-dir>/systemic-out/orders-module.md BEFORE the run. Substitute the absolute skill path for <SKILL_DIR>. Eval 3 is a template requiring a real target supplied at runtime. Reports go under systemic-out/ in the working directory, outside the fixture directories. Isolate runs to prevent stale reports; for re-audits seed the correct previous report. No expected finding count forbids additional evidence-backed defects. Assertions evaluate causal evidence and impact, not agreement with a preferred phrasing. Output selection is tested separately: cases 1-10 explicitly request full to preserve their detailed-format assertions; 11 uses no mode and must default to functional; 12 explicitly requests full on the same invoice fixture; 13 reauds an older full report in default functional mode. Case 13 requires the same previous-report setup as 9. Both modes keep evidence, labels, confidence, impact limits and finding history; only presentation differs.",
+  "notes": "Evals 1, 2, 4, 5, 6, 7, 9 and 10 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1; 5 targets partial failure and loops; 6 is the clean false-positive control; 7 distinguishes actual defenses from independent refund and failed-payment recovery defects; 9 tests an unverified re-audit antecedent; 10 tests independent root causes, historical snapshots and impact-based severity). Evals 8 and 9 need setup: copy their previous-orders-module.md to <working-dir>/systemic-out/orders-module.md BEFORE the run. Substitute the absolute skill path for <SKILL_DIR>. Eval 3 is a template requiring a real target supplied at runtime. Reports go under systemic-out/ in the working directory, outside the fixture directories. Isolate runs to prevent stale reports; for re-audits seed the correct previous report. No expected finding count forbids additional evidence-backed defects. Assertions evaluate causal evidence and impact, not agreement with a preferred phrasing. Output selection is tested separately: cases 1-10 explicitly request full to preserve their detailed-format assertions; 11 uses no mode and must default to functional; 12 explicitly requests full on the same invoice fixture; 13 reauds an older full report in default functional mode. Case 13 requires the same previous-report setup as 9. Both modes keep evidence, labels, confidence, impact limits and finding history; only presentation differs. Since the gated process, every run also writes its workspace at systemic-out/<slug>/ (run.json, sources.json, model.json, checks.json, findings.json, reaudit.json on re-audits, plus phase logs or work.md); the report path is unchanged. Every case therefore carries a workspace assertion graded with scripts/systemic_check.py all <workspace>. Eval 14 needs setup: copy evals/fixtures/rerun-json/orders-module.md to <working-dir>/systemic-out/orders-module.md and evals/fixtures/rerun-json/orders-module/ to <working-dir>/systemic-out/orders-module/ BEFORE the run. The validator itself is tested deterministically by evals/test_systemic_check.py against the golden workspace in evals/fixtures/runs/orders-valid.",
   "evals": [
     {
       "id": 1,
@@ -34,7 +34,8 @@
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
         "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report",
         "Every finding states demonstrated impact, impact not verified and confidence with an evidence basis; confidence and severity are independent.",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"
     },
@@ -60,7 +61,8 @@
         "Every finding carries a severity (critical/high/medium/low)",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
         "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"
     },
@@ -82,7 +84,8 @@
         "No artifact is published, no HTML is rendered and no server/localhost preview is started to display the report",
         "CONDITIONAL — only if the target repo has graphify-out/graph.json: the report states that the graph was used to choose which modules to open, and findings still cite sources read directly. If the target has no graphify-out/, the report must not mention it at all",
         "Distinguishes demonstrated impact from unavailable deployment/latency evidence; critical requires severe supported consequences and confidence is stated separately.",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"
     },
@@ -103,7 +106,8 @@
         "Severities stay as the fixed keywords critical/high/medium/low (not translated)",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
         "Detects at least the closure violation and the missing-guard findings from eval 1 (language choice does not degrade the analysis)",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"
     },
@@ -135,7 +139,8 @@
         "Every finding carries an honesty label (INCONSISTENCY/RISK/AMBIGUITY) and a severity",
         "Findings cite file:line evidence",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"
     },
@@ -163,7 +168,9 @@
         "The check-coverage table gives a verdict for all twelve checks instead of forcing findings: at minimum checks 6, 8 and 12 are marked not verifiable with the reason (in-memory module, no I/O, no queues)",
         "Report still follows the full structure: systems table, mermaid state diagram, limits section",
         "Every finding, if any, carries an honesty label and a severity",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses.",
+        "findings.json lists no high or critical finding, and every checks.json verdict of findings is backed by a confirmed or merged candidate; the clean and not_verifiable verdicts carry what was verified or what was missing."
       ],
       "output_mode": "full"
     },
@@ -194,7 +201,8 @@
         "The rejected-candidates table names the refuted traps with the evidence that killed each one (the decorator, the middleware default, the synchronized _recalc, the guarding caller)",
         "Every reported finding carries an honesty label, a severity and file:line evidence",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"
     },
@@ -216,9 +224,11 @@
         "Classifies the previous deliver()-has-no-guard finding as resolved, citing the guard now present in deliver() (operations.py) as the evidence that resolves it, in a resolved-since-last-report list or table",
         "Marks the findings the previous report missed (at minimum the webhook idempotency flaw, the discount ambiguity and the stored-total drift) as new",
         "The executive summary states all four counts: new, persisting, resolved and not verified, including zero not-verified antecedents in this complete-source fixture.",
-        "Exactly one report remains at systemic-out/orders-module.md — the re-audit replaces the previous file rather than writing a second one alongside",
+        "Exactly one report remains at systemic-out/orders-module.md — the re-audit replaces the previous file rather than writing a second one alongside. The workspace directory systemic-out/orders-module/ beside it is expected, and holds the archived previous report at prior/report.md.",
         "The re-audit keeps the full report structure: systems table, conceptual machines, findings with labels and severities, and the check-coverage table",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses.",
+        "run.json records prior_report with format md-legacy (the previous run has no findings.json), and reaudit.json classifies each of the two previous findings exactly once."
       ],
       "output_mode": "full"
     },
@@ -239,7 +249,8 @@
         "Does not count the antecedent in current findings-per-severity totals.",
         "Does not infer external refund behavior from the facade, inspect outside the requested scope or invent a new concrete defect.",
         "Writes the report under the working directory systemic-out/ and retains the full coverage table.",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"
     },
@@ -262,7 +273,8 @@
         "Rejects the historical snapshot as a double-source-of-truth defect: issuance-time balance and timestamp are intentionally immutable and need not track the live wallet.",
         "Does not invent retry, concurrency or persistence failures unsupported by the supplied implementation.",
         "Provides the full check-coverage table, source evidence and the local report path.",
-        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification."
+        "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"
     },
@@ -287,7 +299,8 @@
         "Does not include GST exposition, systemic diagnosis, check numbers, systems inventories, mermaid diagrams, state matrices or a twelve-check coverage table, including in an appendix.",
         "Independent causes remain distinct; no finding is dropped just to shorten the report.",
         "States material scope limits and missing verification in functional terms, without implying omitted methodology was not performed.",
-        "Writes a local Markdown report under systemic-out/ and returns the path plus functional summary."
+        "Writes a local Markdown report under systemic-out/ and returns the path plus functional summary.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ]
     },
     {
@@ -310,7 +323,8 @@
         "Explains functional impact, triggers, confidence, demonstrated versus unverified impact and recommended action as well as systemic properties.",
         "Covers the same independent invoice obligations as case 11; does not manufacture extra defects or weaken labels solely because full was requested.",
         "Verifies defenses rather than claiming every apparent missing guard/dedupe/recalculation is absent.",
-        "Report prose and headings are in Spanish; fixed honesty labels and severity keywords remain unchanged."
+        "Report prose and headings are in Spanish; fixed honesty labels and severity keywords remain unchanged.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ]
     },
     {
@@ -330,8 +344,33 @@
         "Preserves last verified historical evidence, the scope change and what is needed to verify the external behavior.",
         "Describes the unresolved functional question: whether non-paid orders can be refunded; does not claim the external service accepts or rejects them without evidence.",
         "Does not copy the old theoretical diagnosis, systems inventory or coverage table into the functional report.",
-        "Keeps unverified antecedents separate from current findings-per-severity totals and performs no out-of-scope inspection."
+        "Keeps unverified antecedents separate from current findings-per-severity totals and performs no out-of-scope inspection.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ]
+    },
+    {
+      "id": 14,
+      "name": "re-audit-by-fingerprint",
+      "prompt": "Run a systemic analysis of the orders module at <SKILL_DIR>/evals/fixtures/orders/ (README.md, models.py, operations.py, webhook.py). Use output full.",
+      "expected_output": "Setup seeds a previous run in the current format: systemic-out/orders-module.md plus systemic-out/orders-module/findings.json with two fingerprinted findings. The skill archives both under prior/, runs every phase again, and reconciles by fingerprint: the refund closure finding persists under the same fingerprint, the deliver guard finding is resolved with the guard as evidence, and every other current finding is new.",
+      "files": [
+        "evals/fixtures/orders/README.md",
+        "evals/fixtures/orders/models.py",
+        "evals/fixtures/orders/operations.py",
+        "evals/fixtures/orders/webhook.py",
+        "evals/fixtures/rerun-json/orders-module.md",
+        "evals/fixtures/rerun-json/orders-module/findings.json"
+      ],
+      "assertions": [
+        "Detects the previous run, archives it at systemic-out/orders-module/prior/report.md and prior/findings.json before writing anything else, and records prior_report with format json.",
+        "reaudit.json has exactly the two previous fingerprints as keys: operations.py:refund:closure:undeclared-state and operations.py:deliver:completeness:no-guard.",
+        "The refund closure finding is persisting and points to a current finding about the same root cause, re-verified against operations.py rather than copied from the previous findings.json.",
+        "The deliver finding is resolved, citing the guard `if order.status != \"shipped\":` in deliver() as quoted evidence.",
+        "Current findings without a predecessor (at minimum the webhook idempotency flaw, the discount ambiguity and the stored-total drift) are new, and the report states new / persisting / resolved / not verified counts matching reaudit.json.",
+        "Exactly one report remains at systemic-out/orders-module.md, in full structure with the twelve-row coverage table.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
+      ],
+      "output_mode": "full"
     }
   ]
 }

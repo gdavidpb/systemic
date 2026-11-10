@@ -1,6 +1,9 @@
 # The 12 systemic checks — how to detect each one
 
-Operational guide for Phase 2. For each check: what to look for, how to detect
+Operational guide for phase F3. Every check ends as one entry in
+`checks.json` with a verdict (`findings`, `clean` or `not_verifiable`), and
+every suspected defect as a candidate `C-n` with quoted evidence (see
+`references/run-contracts.md`). Candidates are hypotheses; F4 audits them. For each check: what to look for, how to detect
 it in code or documents, and how to calibrate severity. Checks 1, 2, 10 and 11
 come directly from the GST framework; the rest are practical
 extensions of the same principle (system consistency) for real software with
@@ -41,7 +44,8 @@ medium if it is a latent trap.
 **What**: for every (state, operator) pair the answer must be: a defined
 transition, an explicit prohibition (guard with a clear error), or — the
 finding — a **hole**: the operation proceeds without considering that state.
-**Detect**: build the matrix. Look for operators that mutate state without
+**Detect**: build the matrix (it is written to `checks.json.matrices`, one
+cell per state × operator; every `hole` names its candidate or a note). Look for operators that mutate state without
 checking the current state (missing guard). Contrast with declared rules ("a
 shipped order cannot be canceled") — a missing guard that contradicts a
 declared rule is an INCONSISTENCY, not just a hole.

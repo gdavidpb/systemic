@@ -11,6 +11,11 @@ itself tested.
 A row with no eval is a gap. When you add a check, a rule or a gate, add a
 row here and the case that covers it.
 
+Evals 24 and 25 are **held out** (`split: holdout` in `evals.json`): they
+measure a change and are never used to tune the skill's wording, so they
+are listed apart at the end and do not close a gap in the tables below.
+`BASELINE.md` records how they scored with the skill and without it.
+
 ## The twelve checks
 
 | # | Check | Positive case (a finding) | Restraint case (clean, refuted or not verifiable) |
@@ -45,7 +50,10 @@ row here and the case that covers it.
 | Technique `metamorphic` | 17 | — |
 | Technique `fault_injection` | 17 | — |
 | Technique `repetition` | 16 | `G5Tests` (label needs a repeated call) |
-| Technique labels match the test body | 17 | `G5Tests` (concurrency, fault injection) |
+| Technique labels match the test body | 17 | `G5Tests` (concurrency, fault injection), `TechniqueMarkers` (Python, JavaScript, Go, Java; names, comments and strings do not count) |
+| Expecting an exception is not fault injection | 24 (held out) | `G5Tests`, `TechniqueMarkers` |
+| Technique provided by a helper is cited (`technique_evidence`) | — | `G5Tests` |
+| `by_category` computed by the validator (`counts --write`) | all | `G5Tests` |
 | Trap: assertion on a mock | 17 | — |
 | Trap: snapshot of defective output | 17 | `StockReservations` |
 | Trap: `assertRaises(Exception)` | 17 | — |
@@ -70,6 +78,7 @@ row here and the case that covers it.
 | Refutation: guard in a decorator, dedup in middleware, guarding caller | 7, 12 | — |
 | Refutation does not hide recovery defects | 7, 11 | `AdversarialFixtures` |
 | Dedup: one finding per root cause | 1 | `G4Findings` |
+| Independent verifier recorded per finding (`verification`) | — | `G4Findings` (enum only; who verified is not checkable) |
 | Missing guards on one declared machine are one finding | 1 | `G4Findings` (a second one needs `separate_because`) |
 | Independent causes stay separate | 7, 10 | `AdversarialFixtures` |
 | Severity by damage, not domain | 1, 10 | — |
@@ -104,8 +113,19 @@ row here and the case that covers it.
 | Source changed mid-run: explicit return to F1 | 21 | `InterruptedRun`, `RunState` (redone log says `returned_to`) |
 | Incomplete run discloses why | 23 | `G0Scope`, `RunState` |
 | Gates checked by hand without Python | 22 | — |
+| Hashes and line counts from the validator (`hash`) | all | `HashHelper` |
+| Contracts document what the validator enforces | — | `Documentation` |
+| `SKILL.md` within the skill format (description ≤ 1024, body ≤ 500 lines, references exist) | — | `Documentation` |
+| The description triggers on the right requests | `trigger-evals.json` | `Documentation` (well-formed only) |
 | No artifact, HTML or server | 1, 2, 3 | `G7Report` (no HTML) |
 
 Evals 21–23 induce the runs a prompt alone cannot: an interrupted run whose
 source changed, a machine without Python, and a scope that can no longer be
 satisfied. Their setup is in the `notes` of `evals.json`.
+
+## Held-out cases
+
+| Eval | Fixture | What it measures | Ground truth |
+|---|---|---|---|
+| 24 | `job-leases` (JavaScript, `node:test`) | Positive checks 4, 5, 6, 7, 8, 12 on code the skill's text never saw, in another language; two defended paths to refute; a suite with a red test, an enshrining test, a fake concurrency test and a fixture that skips the interesting state | `JobLeases` (needs node) |
+| 25 | `approvals` (Python, SQLite) | Restraint: defenses in a SQL schema, a compare-and-set transition function and a transactional event marker; exactly one planted drift, rated by its declared use; a strong suite credited without manufactured gaps | `Approvals`, `FixtureSuites` |

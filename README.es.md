@@ -359,9 +359,13 @@ tamaño del alcance:
 - **quick** — unos seis archivos o menos, o un único ciclo de vida. Los
   mismos registros y puertas; el razonamiento va a una sola bitácora
   `work.md`.
-- **standard** — alcances mayores. Una bitácora por fase. Cuando el entorno
-  admite subagentes y hay muchos candidatos, un verificador independiente
-  que nunca vio el modelado audita la evidencia.
+- **standard** — alcances mayores. Una bitácora por fase.
+
+Donde el entorno admite subagentes, un **verificador independiente** que
+nunca vio el modelado relee la evidencia e intenta refutar los hallazgos:
+todos los candidatos en `standard`, y los hallazgos calificados critical o
+high en `quick`. `findings.json` registra qué hallazgos tuvieron esa segunda
+mirada (`verification: independent`) y cuáles solo la de su autor (`self`).
 
 Puedes pedir uno: "…, usa el perfil quick". Los perfiles cambian el costo,
 nunca la evidencia exigida.
@@ -387,6 +391,11 @@ Puedes ejecutar el validador tú mismo en cualquier momento:
 ```sh
 python3 ~/.claude/skills/systemic/scripts/systemic_check.py all systemic-out/orders-module
 ```
+
+El mismo script tiene dos ayudantes que la skill usa para no derivar a mano
+lo que el validador recalcula: `hash <workspace>` imprime el hash y el número
+de líneas de cada archivo del alcance, y `counts <workspace> --write` rellena
+la tabla de cobertura por categoría.
 
 ## Idioma
 
@@ -445,14 +454,19 @@ references/
   run-contracts.md            la forma exacta de cada archivo que escribe una ejecución
   gst-framework.md            el vocabulario conceptual (se lee en F2)
   checks.md                   cómo detectar cada uno de los doce checks (se lee en F3)
+  dedup.md                    un hallazgo por causa raíz: qué se agrupa y qué queda aparte (se lee en F4)
   invariants.md               categorías de invariantes y cobertura por pruebas (se lee en F2 y F5)
-  output-functional.md        formato del reporte functional (por defecto)
-  output-full.md              formato del reporte sistémico detallado
+  reaudit.md                  clasificar los hallazgos de un reporte previo (se lee en F6, solo re-auditorías)
+  output-functional.md        formato y estilo del reporte functional (por defecto)
+  output-full.md              formato y estilo del reporte sistémico detallado
+  run-protocol.md             reanudar, volver a una fase anterior, una puerta que no puede pasar, sin Python
 scripts/
-  systemic_check.py           el validador de puertas (Python 3.9+, biblioteca estándar)
+  systemic_check.py           el validador de puertas y sus ayudantes (Python 3.9+, biblioteca estándar)
 evals/
-  evals.json                  23 evals de ejecución con aserciones
+  evals.json                  25 evals de ejecución con aserciones; la 24 y la 25 están reservadas
+  trigger-evals.json          peticiones que deben y que no deben activar la skill
   COVERAGE.md                 qué eval y qué test cubre cada comportamiento de la skill
+  BASELINE.md                 los casos reservados con la skill y sin ella
   test_systemic_check.py      tests del validador: una violación de contrato por test
   test_adversarial_fixtures.py contraejemplos ejecutables de los fixtures
   fixtures/orders/            un módulo de código con defectos sembrados y una suite en verde que no los ve
@@ -462,6 +476,8 @@ evals/
   fixtures/guarded-elsewhere/ caminos defendidos más defectos de reembolso y recuperación
   fixtures/independent-ledgers/ causas independientes e impacto acotado
   fixtures/stock-reservations/ máquina implícita, concurrencia, un crítico justificado, pruebas con trampas
+  fixtures/job-leases/        reservado, JavaScript: una cola de trabajos con leases y una suite node:test
+  fixtures/approvals/         reservado: defensas en un esquema SQL y una función de transición, una deriva
   fixtures/monorepo/          un repositorio sin foco con mapa de graphify: propuesta de alcance
   fixtures/collision/         un archivo ajeno en la ruta por defecto del reporte
   fixtures/resume/            una ejecución interrumpida en F5 cuyo código cambió desde F1
@@ -475,7 +491,9 @@ evals/
 
 Hay dos tipos de pruebas.
 
-**Tests deterministas**, que solo necesitan Python:
+**Tests deterministas**, que solo necesitan Python (y Node.js para el único
+fixture en JavaScript; sin él esos tests se omiten). El CI los ejecuta en
+cada push y en cada pull request:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -v
@@ -484,7 +502,11 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -
 `test_systemic_check.py` copia la ejecución de referencia, rompe un contrato
 por test —un veredicto que falta, una cita desplazada de su línea, un
 hallazgo critical sin su justificación, un conteo del reporte que no coincide
-con los registros— y comprueba que la puerta correcta lo rechaza.
+con los registros— y comprueba que la puerta correcta lo rechaza. También
+comprueba que lo que las referencias le dicen al modelo coincide con lo que
+el validador exige, y que `SKILL.md` se mantiene dentro del formato de una
+skill (una descripción de 1024 caracteres como máximo, un cuerpo de 500
+líneas como máximo, cada referencia nombrada y presente).
 `test_adversarial_fixtures.py` ejecuta los defectos sembrados en los
 fixtures, de modo que la verdad de referencia de las evals también está
 probada.
@@ -504,6 +526,25 @@ el perfil standard y pruebas excluidas; los 21–23, reanudar una ejecución
 interrumpida, revisar las puertas a mano sin Python y una ejecución
 incompleta. [`evals/COVERAGE.md`](evals/COVERAGE.md) mapea cada
 comportamiento de la skill a las evals y pruebas que lo cubren.
+
+**Evals reservadas.** Los casos 24 y 25 (`"split": "holdout"`) existen para
+medir, no para ajustar. Los demás casos se usaron mientras se escribía el
+texto de la skill, así que pasarlos dice poco sobre un ciclo de vida que el
+texto nunca ha visto. Cuando un caso reservado falla, corrige la instrucción
+general o añade un fixture de desarrollo que muestre la misma debilidad; no
+edites la skill hasta que ese caso concreto pase. El 24 es una cola de
+trabajos en JavaScript con una suite `node:test`; el 25 es un módulo sano
+cuyas defensas viven en un esquema SQL, con una deriva sembrada.
+[`evals/BASELINE.md`](evals/BASELINE.md) registra cómo puntuaron ambos con
+la skill y sin ella.
+
+**Evals de activación** (`evals/trigger-evals.json`): son otro tipo de
+prueba. Veinte peticiones realistas, de las que la mitad debe activar la
+skill y la otra mitad no (una revisión de código, un test que falla,
+cobertura de líneas, escribir una máquina de estados nueva). Prueban la
+`description` de `SKILL.md`, que es todo lo que Claude ve cuando decide si
+usar la skill. Ejecútalas con el optimizador de descripciones de la skill
+`skill-creator` de Anthropic después de cambiar la descripción.
 
 Las evals 6 y 7 son las que más importan a medida que la skill cambia. Una
 herramienta que reporta problemas vale lo que vale su tasa de falsos

@@ -73,7 +73,7 @@ Read the test, not its name. Classify by what the test body does:
 | `stateful` | Generated sequences of operations against a model (`RuleBasedStateMachine`, model-based testing) |
 | `repetition` | The same operation or event applied twice or more, including a retry after a failed first attempt and a delayed replay |
 | `concurrency` | Threads, tasks or transactions forced to interleave (barriers, latches, two sessions on the same row) |
-| `fault_injection` | A dependency made to fail between two writes (a mock that raises, a killed connection), then assertions on what remains |
+| `fault_injection` | A dependency made to fail between two writes (a mock that raises, a killed connection), then assertions on what remains. A test that only expects an operator to refuse (`assertRaises` around a guard) injects nothing: it is `example` |
 | `metamorphic` | Two compositions of operators compared with each other rather than with a fixed value |
 
 ## Coverage levels

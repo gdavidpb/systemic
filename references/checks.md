@@ -3,7 +3,8 @@
 Operational guide for phase F3. Every check ends as one entry in
 `checks.json` with a verdict (`findings`, `clean` or `not_verifiable`), and
 every suspected defect as a candidate `C-n` with quoted evidence (see
-`references/run-contracts.md`). Candidates are hypotheses; F4 audits them. For each check: what to look for, how to detect
+`references/run-contracts.md`). Candidates are hypotheses; F4 audits them and
+groups them by root cause (`references/dedup.md`). For each check: what to look for, how to detect
 it in code or documents, and how to calibrate severity. Checks 1, 2, 10 and 11
 come directly from the GST framework; the rest are practical
 extensions of the same principle (system consistency) for real software with

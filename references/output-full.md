@@ -78,3 +78,15 @@ verified), or not verifiable (missing material). Never blur clean and not
 verifiable. Then describe declared
 and implicit limits.>
 ```
+
+## Style
+
+- Diagnose with the framework's vocabulary (closure, operator, limit, minimal
+  expression) and connect the property to its functional impact.
+- Prioritize: a few well-evidenced findings beat 30 trivial ones. If there
+  are more than ~10, keep the minor ones brief: their heading plus one line
+  each for evidence and action.
+- Mermaid diagrams draw what is REAL (the built figure); when it differs from
+  what is declared, draw both or mark the differences — that divergence is
+  usually the most valuable finding.
+- Close with the most important missing component when supported.

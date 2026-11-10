@@ -78,3 +78,13 @@ For example, describe a failed retry as: "A payment that fails on its first
 delivery remains unapplied even when the same payment is retried after the
 invoice is issued." The consequence is an unpaid invoice despite the retry;
 it is not evidence by itself of external monetary loss or production frequency.
+
+## Style
+
+- Explain the behavior and its impact in everyday language: "retrying the
+  refund records it twice", not "closure under repetition fails".
+- Prioritize: a few well-evidenced findings beat 30 trivial ones. If there
+  are more than ~10, keep the minor ones brief: their heading plus one line
+  each for evidence and action.
+- Lead with the corrective action that has the greatest verified functional
+  benefit; do not append a theoretical architecture explanation.

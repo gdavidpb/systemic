@@ -1,22 +1,20 @@
 ---
 name: systemic
 description: >-
-  Systemic analysis of software based on General Systems Theory (GST): models a
-  solution as systems (elements, operators, conceptual state machines) and
-  verifies their consistency — closure, reachability, transition completeness,
-  invariants, operator ambiguity, idempotency, symmetry, minimal expression and
-  system limits — and audits how well the test suite protects the machine's
-  invariants, with coverage per invariant category (state, transition,
-  logical, temporal, repetition, concurrency, atomicity, algebraic). It
-  produces a local Markdown findings report with evidence, severity and
-  recommendations, backed by a validated run workspace. Use it
-  whenever the user asks for a systemic analysis, wants to review the
-  consistency of states or a state machine, find inconsistencies or
-  contradictions in a design, flow or operation, audit a lifecycle (workflow,
-  saga, state machine), apply systems thinking or GST/TGS, asks "is my
-  design consistent?", or asks whether their tests really cover the
-  invariants of a lifecycle — even if they never say the word "systemic".
-  Works on code, design documents, or both.
+  Systemic analysis of software with state, based on General Systems Theory
+  (GST): models code or a design document as systems, operators and state
+  machines, checks their consistency (closure, transition completeness,
+  reachability, idempotency, concurrency, invariants) and audits which
+  invariants the test suite really protects. Writes a local Markdown findings
+  report with evidence, severity and recommendations. Use it whenever the user
+  asks for a systemic analysis, wants to review a state machine, lifecycle,
+  workflow or saga for consistency, find contradictions between what a design
+  or README promises and what the code does, apply systems thinking or
+  GST/TGS, asks "is my design consistent?", or asks whether their tests
+  really cover the invariants of a lifecycle — even if they never say the
+  word "systemic". Not for general code review, style or security review,
+  debugging one failing test or stack trace, measuring line coverage, or code
+  with no state or lifecycle to model.
 ---
 
 # /systemic — Systemic analysis of software (GST)
@@ -29,20 +27,26 @@ those properties.
 
 The analysis runs as nine phases, F0–F8. Each phase reads the files the
 previous one wrote, writes its own, and passes a deterministic gate before
-the next phase starts. The files are specified in
-`references/run-contracts.md`. The gates are checked by
-`scripts/systemic_check.py`. This file defines what each phase does; the
-contracts file defines the exact shape of what it writes.
+the next phase starts. The gates are checked by `scripts/systemic_check.py`.
+This file defines what each phase does; the references hold the detail a
+phase needs only when it gets there:
+
+| Read | When |
+|---|---|
+| `references/run-contracts.md` | In F0, before writing `run.json`; then the section of each file right before writing that file. It is the exact shape the gates check. |
+| `references/gst-framework.md` | Before F2: the vocabulary and its teaching examples. |
+| `references/invariants.md` | In F2 and again in F5: invariant categories, test techniques, coverage levels. |
+| `references/checks.md` | In F3: how to detect each of the twelve checks. |
+| `references/dedup.md` | In F4, step 4c, when candidates share a machine, an operator or a field. |
+| `references/reaudit.md` | In F6, only when a previous report of the same scope exists. |
+| `references/output-functional.md` or `references/output-full.md` | In F7: only the selected mode's format and style. |
+| `references/run-protocol.md` | Only when a run leaves the straight path: resuming, going back to an earlier phase, a gate that cannot pass, no `python3`. |
 
 ## Shared rules
 
-**Vocabulary.** Read `references/gst-framework.md` before F2 to internalize
-the vocabulary (elements, operators, closure, limits, minimal expression) and
-its teaching examples. Read `references/invariants.md` in F2 and again in F5:
-it defines the invariant categories, the test techniques and the coverage
-levels. Use that vocabulary in the internal analysis and in
-`full` reports; translate findings into functional consequences in
-`functional`.
+**Vocabulary.** Use the vocabulary of `references/gst-framework.md` in the
+internal analysis and in `full` reports; translate findings into functional
+consequences in `functional`.
 
 **Language.** Write the whole report — section headers, summaries,
 diagnoses, recommendations — in the language the user asks for. If the user
@@ -97,9 +101,10 @@ shorter.
 - **quick**: about six files or fewer, or a single lifecycle. All JSON files
   and gates still apply. The phase logs (`00-scope.md` … `06-reaudit.md`)
   collapse into one `work.md` with one section per phase, holding what each
-  log would hold, diagrams included. F4 runs without a verifier subagent.
-- **standard**: everything else. One Markdown log per phase, and an
-  independent verifier in F4 when the scope is large.
+  log would hold, diagrams included. In F4 the independent verifier
+  re-checks only the findings rated critical or high.
+- **standard**: everything else. One Markdown log per phase, and the
+  independent verifier re-checks every candidate in F4.
 
 Pick the profile from the scope (`profile_source: auto`), unless the user
 names one. A profile changes cost, never the evidence bar.
@@ -109,44 +114,27 @@ names one. A profile changes cost, never the evidence bar.
 1. **Context firewall.** Each phase starts by reading its input files from the
    workspace, not by recalling earlier reasoning. This keeps the run correct
    across context compaction and lets an interrupted run resume at
-   `run.json.phase`. To resume, log a `resumed` event under the phase in
-   `run.json`, then run `systemic_check.py all <workspace>` before anything
-   else, logging its result right after `resumed` as one entry under the
-   earliest failing phase: a source that
-   changed since F1, or any earlier gate that no longer passes, sends the
-   run back to the earliest failing phase as rule 2 says. Redo means
-   rebuilding that phase's files from its inputs, keeping stable ids where
-   the underlying element is unchanged.
-2. **Single writer.** A phase writes only its own files and `run.json`. If a
-   later phase discovers that an earlier output is wrong, go back explicitly:
-   set `phase` to that phase, add a `returned_to` log entry with the reason,
-   delete the files of every later phase (they are stale; deleting them is
-   part of the same run, not a fresh one), and redo it and everything after
-   it: rebuild each phase's files from its inputs rather than editing them
-   in place. In the quick profile, keep the `work.md` sections of the
-   phases before the one returned to and rewrite the rest. The redone
-   phase's log opens with a line `returned_to: <reason>` (a fixed keyword,
-   in every language) **[gate]**. Never patch an
-   earlier file silently.
+   `run.json.phase`.
+2. **Single writer.** A phase writes only its own files and `run.json`. Never
+   patch an earlier file silently: if a later phase finds an earlier output
+   wrong, go back to that phase explicitly and redo everything after it.
 3. **Gates.** After writing a phase's files and its log (the phase log,
    or its `work.md` section), run
    `python3 <skill-dir>/scripts/systemic_check.py <gate> <workspace>`. Fix
    the reported violations inside the same phase and run it again, at most
-   two corrections. If it still fails — or at once, when every fix would
-   break a constraint the user set (a scope they forbade changing, a file
-   they excluded) — stop: set `status: incomplete` with `incomplete_reason`
-   naming the gate and the unresolved violations, keep `phase` at the phase
-   whose gate failed, write the report with that reason in its first
-   section, and close as F8 says. Log every gate result in `run.json.log`.
-4. **No Python.** If `python3` is not available, apply each gate as a
-   checklist against `references/run-contracts.md` (every **[gate]** rule,
-   including the counts and technique markers the validator would compute),
-   log each as `gate_passed` with `checked manually` in its detail, set
-   `validation: "manual"`, and state in the report's scope section that the
-   gates were checked manually.
-5. **Terminal states.** A run ends `complete` or `incomplete`. `needs_scope`
+   two corrections. Log every gate result in `run.json.log`.
+4. **Terminal states.** A run ends `complete` or `incomplete`. `needs_scope`
    is a pause: ask the user and continue F0 with the answer. Never stop in
    the middle of a phase.
+
+That is all a run needs while every gate passes. Four situations have their
+own procedure, with log entries the gates check; read its section of
+`references/run-protocol.md` before acting on any of them: **resuming** an
+interrupted run (the user asks to finish one, or `run.json` is already
+`in_progress`); **going back** because an earlier output is wrong or a source
+changed since F1; **a gate that cannot pass** after two corrections, or whose
+every fix would break a constraint the user set (the run ends `incomplete`);
+and **no `python3`** (the gates are applied by hand and the report says so).
 
 ## F0 — Scope
 
@@ -212,7 +200,10 @@ Read the sources and record what the system promises.
 
 - **Inputs**: `run.json`.
 - **Work**: read every target. Record each file read with its hash and line
-  count, and whether it was read in full or in which ranges. Record test
+  count, and whether it was read in full or in which ranges. Do not compute
+  those two yourself: `systemic_check.py hash <workspace>` prints one
+  `{path, sha256, lines}` entry per file under the targets, exactly as G1
+  recomputes them; copy the entries of the files you read. Record test
   files with `role: test`; their assertions are audited in F5 and are not
   declared claims. Extract the
   declared claims `D-n` — what README, docstrings, specs, comments and
@@ -266,44 +257,40 @@ Describe the built figure, Tangram-style.
 
 Run the twelve checks and produce candidates, not findings.
 
-- **Inputs**: `model.json`, `sources.json`, `references/checks.md` (read it
-  in this phase; it contains the "how to detect" for each check).
-- **The twelve checks**:
+- **Inputs**: `model.json`, `sources.json`, `references/checks.md`.
+- **The twelve checks** — what each one asks; `references/checks.md` says how
+  to detect it:
   1. **Closure**: does every operation produce an element/state the system
      can represent? (the `1/2 = 0.5` problem in the integers).
-  2. **Operator ambiguity**: does any operator admit multiple interpretations
+  2. **Operator ambiguity**: does any operator admit several interpretations
      depending on context or argument type? (the `A U B` problem).
-  3. **Transition completeness**: state × operator matrix: is each cell
-     *defined*, *forbidden with a guard*, or a **hole**?
-  4. **Reachability**: unreachable states (nothing produces them), absorbing
-     non-terminal states (no exit), dead transitions.
+  3. **Transition completeness**: in the state × operator matrix, is each
+     cell *defined*, *forbidden with a guard*, or a **hole**?
+  4. **Reachability**: unreachable states, absorbing non-terminal states,
+     dead transitions.
   5. **Illegal states representable**: field combinations the business
      forbids but the model allows to be written.
-  6. **Invariants and partial failure**: which invariants exist, which
-     operator maintains each, and what happens if that operator fails halfway
-     (compensation).
-  7. **Idempotency and re-entry**: closure under repetition: does retrying
-     the operator (webhook, queue retry) produce the same state, or
-     duplicates?
-  8. **Concurrency**: two operators on the same element at once: do they
-     commute, serialize (lock), or clobber each other (lost update)?
-  9. **Symmetry/duality**: operators without an inverse: open without close,
-     lock without release, pause without resume. A resource that opens and
-     never closes is a structural leak.
-  10. **Minimal expression**: derivable components duplicated as primitives
-      (a total both stored AND computed): two sources of truth that drift.
-  11. **System limits**: requirements outside the representable set (evens +
-      addition never produce 7). Signal: hacks, special cases and "wood
-      cutting" that reveal missing pieces.
-  12. **Feedback loops**: retries + queues + timeouts + alerts feeding each
-      other and amplifying (retry storms, compensation loops).
+  6. **Invariants and partial failure**: which operator maintains each
+     invariant, and what happens if it fails halfway (compensation).
+  7. **Idempotency and re-entry**: does retrying the operator (webhook,
+     queue retry) produce the same state, or duplicates?
+  8. **Concurrency**: two operators on one element at once: do they commute,
+     serialize (lock), or clobber each other (lost update)?
+  9. **Symmetry/duality**: operators without an inverse: open without
+     close, lock without release, pause without resume.
+  10. **Minimal expression**: derivable components also stored as
+      primitives: two sources of truth that drift.
+  11. **System limits**: requirements outside the representable set,
+      revealed by hacks, special cases and "wood cutting".
+  12. **Feedback loops**: retries, queues, timeouts and alerts feeding each
+      other and amplifying.
 - **Work**: record a verdict for every check — **findings**, **clean** (say
   what was verified, with evidence) or **not verifiable** (say what was
   missing). Apply only what the material lets you verify honestly; never turn
   missing evidence into a clean verdict. Build the state × operator matrix
   for every machine with ≤ 8 declared states (built states when nothing is
-declared); an undeclared state the code writes adds a row, it does not lift
-the requirement. Write each suspected defect as a
+  declared); an undeclared state the code writes adds a row, it does not lift
+  the requirement. Write each suspected defect as a
   candidate `C-n` with quoted evidence, the condition for a RISK and the
   question for an AMBIGUITY. A candidate that breaks a catalogued invariant
   lists its `I-n` in `refs`.
@@ -337,42 +324,32 @@ itself a system, and this phase is its consistency check.
     illegal representable state (5) and a declared-vs-built divergence at
     once. Keep it ONCE, under the check that explains it best, list the other
     manifestations inside it, and record the others in `merged`. Group only
-    when correcting one shared point removes all the manifestations. Similar
-    recommendations or the same repair pattern in independent
-    implementations do not establish a shared root cause. When uncertain, try
-    isolated repairs: if fixing one leaves the other reproducible, keep
-    separate findings and explain their relationship.
-    **Missing guards on one machine.** When several operators write the
-    same machine's state without checking the current one, and the
-    allowed transitions are declared in one place (a README, a spec, an
-    enum with documented rules), the root cause is that the declared
-    machine is enforced nowhere: one transition function over the
-    declared table removes every hole at once. Report ONE finding, name
-    each operator and its worst consequence as a manifestation, and rate
-    it by the worst manifestation. Keep a separate finding when a guard
-    concerns a different machine, a rule outside the transition table (an
-    amount check, an ownership check), or a defect that remains after the
-    table exists (writing an undeclared state is closure, not a missing
-    guard). A hole that needs an operator that does not exist (a review
-    step nothing performs) belongs to the finding about that missing
-    operator, recorded under that finding's own check (usually 4,
-    reachability), not under 3. This rule is the isolated-repair test applied to a machine —
-    the shared repair is the transition function — so it wins over
-    keeping each operator separate. Record the finding under check 3 and
-    list the other checks among its manifestations. A second check-3
-    finding on the same machine needs `separate_because`: the rule or
-    defect that the transition table would not fix **[gate]**.
+    when correcting one shared point removes all the manifestations.
+    Several operators writing one machine's state without checking the
+    current one, when its transitions are declared in one place, are ONE
+    finding under check 3: the declared machine is enforced nowhere.
+    Whenever candidates share a machine, an operator or a field, read
+    `references/dedup.md` before deciding: what groups, what stays
+    separate, and the `separate_because` G4 requires **[gate]**.
   - **4d Severity and confidence.** Rate each surviving finding against the
     rubric below (the damage it causes, not the check's typical ceiling) and
     give it a fingerprint derived from its root cause.
 - **Independent verifier.** 4a and 4b fight confirmation bias, and the author
-  of a finding is the worst-placed auditor of it. In profile `standard`, when
-  the scope is large (a multi-module repo, or more than ~10 candidates) and
-  the environment can spawn subagents, delegate 4a and 4b. Give the subagent
-  ONLY `checks.json`, `sources.json`, the source paths and the instructions
-  of 4a–4b, not the F1–F3 reasoning. It returns, per `C-n`, confirmed or
-  rejected with the evidence it read. Otherwise run the gates yourself,
-  strictly against re-read sources, never against memory.
+  of a finding is the worst-placed auditor of it: you remember why you
+  believed it. When the environment can spawn subagents, hand 4a and 4b to
+  one that never saw the modeling. In profile `standard`, send every
+  candidate before you rate anything. In profile `quick`, run 4a–4d
+  yourself, then send the findings you rated critical or high: the ones
+  where a false positive costs the reader most. Give the subagent ONLY the
+  candidates (their entries in `checks.json`), `sources.json`, the source
+  paths and the instructions of 4a–4b; not the F1–F3 reasoning, and not your
+  verdict. It returns, per `C-n`, confirmed or rejected with the evidence it
+  read. A rejection it supports with evidence moves the candidate to
+  `rejected`; if you disagree, re-read the lines it cites and write both
+  readings in the audit log rather than overruling it silently. Record
+  `verification: independent` on the findings it confirmed and `self` on the
+  others. Without subagents, run 4a and 4b yourself, strictly against
+  re-read sources, never against memory, and every finding is `self`.
 - **Outputs**: `findings.json`; `04-audit.md` with the log of every gate.
 - **Gate G4.**
 
@@ -410,10 +387,9 @@ the invariant is violated. Running code is not asserting it.
      `detected`, `undetected` or `enshrined` (`not_assessed` when the suite
      is out of scope).
   7. **Counts.** Write the phase log first (`05-tests.md`, or the F5
-     section of `work.md`). Then leave `by_category` to the validator: write `{}`, run G5,
-     copy the JSON it reports as expected, run G5 again. That first, planned
-     failure is logged as `gate_failed` but does not count toward the two
-     corrections of the run protocol.
+     section of `work.md`). Do not count `by_category` by hand:
+     `systemic_check.py counts <workspace> --write` fills it from the
+     invariant catalog and the coverage entries. Then run G5.
 - **Never run the suite.** The audit reads assertions. A green suite proves
   that its assertions hold, not that they assert the invariants.
 - **Outputs**: `tests.json`, `05-tests.md` (the reasoning per invariant).
@@ -427,30 +403,19 @@ the invariant is violated. Running code is not asserting it.
 Skip this phase when `run.json.prior_report` is null, and log it in
 `run.json.log` as `{"phase": "F6", "event": "skipped"}`.
 
+On a re-audit, read `references/reaudit.md` first: it defines when a previous
+finding is persisting, resolved or not verified, and how to match it.
+
 - **Inputs**: `findings.json`; `prior/findings.json` (format `json`) or
   `prior/report.md` (format `md-legacy`).
-- **Work**: classify every previous finding:
-  - **persisting**: the old root cause is still evidenced. It passed F4 like
-    any other finding (never copied on faith) and points to the current
-    fingerprint that continues it.
-  - **resolved**: current evidence shows the old defect is corrected, or an
-    explicit contract change makes the old requirement inapplicable. Cite
-    that evidence. A missing file, moved implementation or stale citation
-    alone does not prove a fix.
-  - **not verified**: the old finding cannot be confirmed or resolved with
-    the current material or scope, including behavior delegated to an
-    unavailable service. Keep its last verified evidence, what changed, and
-    what is needed to verify it. Do not present its old severity as a
-    current verified finding.
-  - Every current finding without a predecessor is **new**.
-  With `json`, match by fingerprint first and confirm by root cause. With
-  `md-legacy`, match each previous heading by its cited evidence and root
-  cause.
+- **Work**: classify every previous finding as **persisting**, **resolved**
+  or **not verified**; every current finding without a predecessor is
+  **new**. Nothing is copied on faith and nothing is resolved by absence: a
+  persisting finding passed F4 like any other, and a resolution cites the
+  evidence of the fix.
 - **Outputs**: `reaudit.json`, `06-reaudit.md`.
-- **Invariants**: these counts track review status, independently of the
-  honesty labels. Unverified antecedents are not included in current
-  findings-per-severity totals. Switching modes does not reset the history;
-  an older `full` report does not force `full` next time.
+- **Invariants**: unverified antecedents never count in the current
+  severity totals, and switching modes does not reset the history.
 - **Gate G6.**
 
 ## F7 — Report
@@ -533,20 +498,3 @@ Confidence describes how well the diagnosis is supported, not its damage:
 high for direct source evidence plus a concrete trace, medium when a key
 prerequisite has partial support, low when material leaves major uncertainty.
 Low confidence never permits reporting a finding without evidence.
-
-## Style
-
-- In `full`, diagnose with the framework's vocabulary (closure, operator,
-  limit, minimal expression) and connect the property to its functional
-  impact. In `functional`, explain the behavior and its impact in everyday
-  language: "retrying the refund records it twice", not "closure under
-  repetition fails".
-- Prioritize: a few well-evidenced findings beat 30 trivial ones. If there
-  are more than ~10, keep the minor ones brief: their heading plus one line
-  each for evidence and action.
-- In `full`, Mermaid diagrams draw what is REAL (the built figure); when it
-  differs from what is declared, draw both or mark the differences — that
-  divergence is usually the most valuable finding.
-- In `full`, close with the most important missing component when supported.
-  In `functional`, prioritize the corrective action with the greatest verified
-  functional benefit; do not append a theoretical architecture explanation.

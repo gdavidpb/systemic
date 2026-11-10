@@ -402,7 +402,8 @@ the invariant is violated. Running code is not asserting it.
   6. **Findings against the suite.** Classify every confirmed finding as
      `detected`, `undetected` or `enshrined` (`not_assessed` when the suite
      is out of scope).
-  7. **Counts.** Leave `by_category` to the validator: write `{}`, run G5,
+  7. **Counts.** Write the phase log first (`05-tests.md`, or the F5
+     section of `work.md`). Then leave `by_category` to the validator: write `{}`, run G5,
      copy the JSON it reports as expected, run G5 again. That first, planned
      failure is logged as `gate_failed` but does not count toward the two
      corrections of the run protocol.

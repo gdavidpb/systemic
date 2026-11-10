@@ -345,6 +345,12 @@ class G3Checks(GateTestCase):
         self.ws.edit("checks.json", lambda d: d["matrices"][0]["notes"].pop("delivered/O-5"))
         self.assertFails("G3", "hole delivered/O-5")
 
+    def test_hole_may_belong_to_several_candidates(self):
+        self.ws.edit("checks.json", lambda d: d["matrices"][0]["notes"].update(
+            {"draft/O-4": {"candidates": ["C-3", "C-7"]}}))
+        code, out = self.ws.check("G3")
+        self.assertEqual(code, 0, out)
+
     def test_small_machine_needs_a_matrix(self):
         # Eight declared states plus the undeclared refund_pending: the
         # undeclared state adds a row, it does not lift the requirement.

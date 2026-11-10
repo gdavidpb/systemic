@@ -173,7 +173,8 @@ rest of the previous workspace, including any older `prior/`.
     filters it out, an idempotent no-op) is also `guarded`, with a note.
   - `hole`: the operator proceeds without considering this state, including
     a write the declared rules forbid.
-  Every `hole` has a note naming a candidate or explaining it **[gate]**.
+  Every `hole` has a note naming a candidate (`candidate`, or `candidates`
+  when the hole belongs to several) or explaining it **[gate]**.
 - `refs` names the model ids a candidate rests on: transitions `T-n`, and
   the invariants `I-n` it breaks, so F5 can ask whether a test would catch it.
 - Candidates are hypotheses. They become findings only in F4.

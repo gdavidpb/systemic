@@ -181,10 +181,8 @@ class G3Checks(GateTestCase):
         self.assertFails("G3", "hole delivered/O-5")
 
     def test_small_machine_needs_a_matrix(self):
-        def shrink(d):
-            d["machines"][0]["states"].remove("refund_pending")
-            d["machines"][0]["transitions"] = [t for t in d["machines"][0]["transitions"] if t["to"] != "refund_pending"]
-        self.ws.edit("model.json", shrink)
+        # Eight declared states plus the undeclared refund_pending: the
+        # undeclared state adds a row, it does not lift the requirement.
         self.ws.edit("checks.json", lambda d: d.update(matrices=[]))
         self.assertFails("G3", "needs a matrix")
 

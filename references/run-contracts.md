@@ -58,7 +58,7 @@ Conventions:
 | `status` | `in_progress`, `needs_scope`, `complete`, `incomplete` |
 | `scope_proposal` *(text)* | required when `status` is `needs_scope` **[gate]** |
 | `incomplete_reason` *(text)* | required when `status` is `incomplete` **[gate]** |
-| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to", "detail"}]` |
+| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped", "detail"}]`; `skipped` records F5 when there is no previous report |
 
 **Re-audit setup.** When `systemic-out/<slug>.md` already exists and is a
 systemic report of the same scope, F0 archives it before anything is
@@ -138,9 +138,15 @@ rest of the previous workspace, including any older `prior/`.
 - Every candidate is listed under its own check **[gate]**.
 - `RISK` candidates need `condition` *(text)*; `AMBIGUITY` candidates need
   `question` *(text)* **[gate]**.
-- Every machine with ≤ 8 states has a matrix unless check 3 is
-  `not_verifiable` **[gate]**. Cells are `defined`, `guarded` or `hole`, one
-  per operator. Every `hole` has a note naming a candidate or explaining it **[gate]**.
+- Every machine with ≤ 8 declared states (built states when none are
+  declared) has a matrix unless check 3 is `not_verifiable` **[gate]**. It has
+  a row for every built state and one cell per operator **[gate]**:
+  - `defined`: the operator performs a transition the declared rules allow
+    from this state.
+  - `guarded`: the operator refuses this state with an explicit check.
+  - `hole`: the operator proceeds without considering this state, including
+    a write the declared rules forbid.
+  Every `hole` has a note naming a candidate or explaining it **[gate]**.
 - Candidates are hypotheses. They become findings only in F4.
 
 ## `findings.json` — F4

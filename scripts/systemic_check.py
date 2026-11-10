@@ -482,8 +482,9 @@ def g3(ctx):
     check3 = next((c for c in checks if isinstance(c, dict) and c.get("id") == 3), {})
     if check3.get("verdict") != "not_verifiable":
         for mid, machine in machines.items():
-            if len(machine.get("states") or []) <= 8 and mid not in matrices:
-                e.append(f"G3 checks.json.matrices: machine {mid} has <=8 states and needs a matrix")
+            size = len(machine.get("declared_states") or machine.get("states") or [])
+            if size <= 8 and mid not in matrices:
+                e.append(f"G3 checks.json.matrices: machine {mid} has <=8 declared states and needs a matrix")
     need_log(ctx, "G3", e)
     return e
 

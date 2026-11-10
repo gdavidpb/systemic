@@ -12,7 +12,9 @@ against those records; see `references/run-contracts.md`.
 # Systemic analysis — <scope>
 
 ## Executive summary
-<3-6 sentences: what was modeled and the most serious finding, plus the
+<3-6 sentences: the scope reviewed (and, when they apply, that graphify
+informed it or that the gates were checked manually), what was modeled and
+the most serious finding, plus the
 count line, whose keywords stay in English in every language:>
 critical: N · high: N · medium: N · low: N
 <For a re-audit, also:>
@@ -23,8 +25,8 @@ new: N · persisting: N · resolved: N · not verified: N
 
 ## Conceptual machines
 <Per machine in model.json: a mermaid stateDiagram-v2 (declared + built;
-mark hole transitions) and, when it has <=8 states, the state x operator
-matrix from checks.json.>
+mark hole transitions) and, when it has <=8 declared states, the state x
+operator matrix from checks.json.>
 
 ## Findings
 <Ordered by severity. Each one:>
@@ -36,8 +38,10 @@ matrix from checks.json.>
   conditions and impact not verified; confidence high/medium/low with its basis>
 - **Recommendation**: <concrete action>
 
-<For a re-audit, include the resolved and not-verified antecedent tables
-defined in SKILL.md, even if one is empty.>
+<For a re-audit, include the two tables defined in SKILL.md F6, even if
+one is empty: Resolved since last report | previous finding | evidence of
+the fix |, and Not verified | previous finding | last verified evidence |
+what changed | what is needed |.>
 
 <When findings.json has rejected candidates, include a compact table:
 candidate + evidence that refuted it. Omit it when there are none.>

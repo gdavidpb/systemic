@@ -85,8 +85,9 @@ shorter.
 ### Profiles
 
 - **quick**: about six files or fewer, or a single lifecycle. All JSON files
-  and gates still apply; the phase logs collapse into one `work.md`, and F4
-  runs without a verifier subagent.
+  and gates still apply. The phase logs (`00-scope.md` … `05-reaudit.md`)
+  collapse into one `work.md` with one section per phase, holding what each
+  log would hold, diagrams included. F4 runs without a verifier subagent.
 - **standard**: everything else. One Markdown log per phase, and an
   independent verifier in F4 when the scope is large.
 
@@ -241,7 +242,9 @@ Run the twelve checks and produce candidates, not findings.
   what was verified, with evidence) or **not verifiable** (say what was
   missing). Apply only what the material lets you verify honestly; never turn
   missing evidence into a clean verdict. Build the state × operator matrix
-  for every machine with ≤ 8 states. Write each suspected defect as a
+  for every machine with ≤ 8 declared states (built states when nothing is
+declared); an undeclared state the code writes adds a row, it does not lift
+the requirement. Write each suspected defect as a
   candidate `C-n` with quoted evidence, the condition for a RISK and the
   question for an AMBIGUITY.
 - **Outputs**: `checks.json`, `03-checks.md` (the reasoning per check).
@@ -333,9 +336,14 @@ Render the selected mode from the records, not from memory.
 - **Work**: write `report_path`, replacing a previous report of this scope.
   Translate the format's headers into the report's language. Each confirmed
   finding becomes one `### [severity] [LABEL] <title>` heading with its
-  recorded title. The summary carries the fixed-keyword count line, plus the
-  re-audit count line and the resolved and not-verified tables on a
-  re-audit. Evidence uses relative `file:line` references or document
+  recorded title. The summary carries the fixed-keyword count line. On a
+  re-audit it also carries the re-audit count line, and the report adds two
+  tables, present even when empty: **Resolved since last report** (previous
+  finding · evidence of the fix) and **Not verified** (previous finding ·
+  last verified evidence · what changed · what is needed to verify it). The
+  report's scope statement says what was reviewed and any material limit;
+  it also notes manual gate checks (`validation: manual`) and, in `full`
+  only, that graphify informed the scope. Evidence uses relative `file:line` references or document
   sections, so the report survives being committed and read by someone else.
 - **Invariants**: the report adds no finding, severity or citation that is not
   in the records, and drops none that is.
@@ -343,8 +351,9 @@ Render the selected mode from the records, not from memory.
 
 ## F7 — Close
 
-- Run `systemic_check.py all <workspace>`. Set `phase: F7` and
-  `status: complete`, or `incomplete` with its reason.
+- Set `phase: F7` and `status: complete` (or `incomplete` with its reason),
+  then run `systemic_check.py all <workspace>`. If it fails, fix the
+  reported phase as the run protocol says.
 - In chat, reply with the report path, the executive summary and the single
   most serious finding; the user reads the rest in the file. For an
   incomplete run, lead with what is missing and how to unblock it. Do not

@@ -2,22 +2,20 @@
 
 *[Léelo en español](README.es.md)*
 
-**A Claude Code skill that audits software the way General Systems Theory
-audits a system — with functional findings by default and a detailed systemic
-report on request.**
+**A Claude Code skill that audits the consistency of software with state —
+lifecycles, workflows, sagas, anything with a `status` column — the way
+General Systems Theory audits a system.**
 
-Most serious bugs are not typos. They are violations of systemic properties:
-an operation that produces a state the system cannot represent, an operator
-with no inverse, a value that is both stored and derived, a lifecycle whose
-declared rules the code contradicts. `systemic` models your solution as a
-system — elements, operators, conceptual state machines — and verifies twelve
-consistency properties against it.
-
-It works on code, on design documents, or on both.
+It models your code or design as a system of elements, operators and state
+machines, checks twelve consistency properties, and writes a Markdown report
+on your disk. Every finding cites the line it rests on, has survived an
+attempt to refute it, and is checked by a validator before you read it.
 
 ```
 /systemic analyze the order lifecycle in src/orders
 ```
+
+It works on code, on design documents, or on both.
 
 ---
 
@@ -49,8 +47,8 @@ def refund(order):
 
 The order is now outside every operation the system defines. Not terminal, so
 nothing archives it. Not declared, so nothing reads it. A linter sees a string
-assignment. `systemic` detects the closure violation internally and reports its functional
-consequence by default; `full` also explains the systemic diagnosis.
+assignment. `systemic` sees a closure violation and tells you what it does to
+your orders.
 
 ## Install
 
@@ -60,20 +58,27 @@ The folder name must match the skill name, so clone it as `systemic`:
 git clone https://github.com/gdavidpb/systemic ~/.claude/skills/systemic
 ```
 
-That's it — Claude Code picks it up from `~/.claude/skills/`. For a
-project-scoped install, clone into `.claude/skills/systemic` inside the repo
-instead.
+Claude Code picks it up from `~/.claude/skills/`. For a project-scoped
+install, clone into `.claude/skills/systemic` inside your repository instead.
 
-## Use
+**Requirements**
 
-Ask for it by name, or just describe the problem — the skill triggers on the
+- [Claude Code](https://claude.com/claude-code).
+- Python 3.9 or newer on the machine where Claude Code runs (recommended).
+  The skill uses it to run its validator, which needs nothing beyond the
+  standard library. Without Python the run still works: the same checks are
+  applied by hand and the report says so.
+
+## Quick start
+
+Ask for it by name, or describe the problem — the skill triggers on the
 intent, not the keyword:
 
 ```
 /systemic audit the subscription lifecycle in billing/
 ```
 ```
-Is this design consistent? [paste or point at a design doc]
+Is this design consistent? docs/rental-design.md
 ```
 ```
 Find contradictions between what the README promises and what the code does.
@@ -82,9 +87,81 @@ Find contradictions between what the README promises and what the code does.
 Review my state machine — I think there are transitions nobody handles.
 ```
 
-Point it at a path, a design document, or both. For a large repo with no
-focus, it will propose narrowing to the subsystem with the most state — that
-is where the analysis pays off.
+Point it at a path, a design document, or both. When the run finishes you get,
+in the chat, the path of the report, a short summary and the most serious
+finding. The full report is at `systemic-out/<scope>.md` in your project.
+
+If you point it at a large repository with no focus, it proposes the
+subsystem with the most state and waits for your answer before it starts.
+
+## How a run works
+
+A run goes through eight phases. Each phase writes its results to disk, and
+a validator checks them before the next phase starts. Nothing the report says
+can come from a step that was skipped.
+
+```mermaid
+flowchart TD
+  REQ(["Your request"]) --> F0["F0 Scope"]
+  F0 --> G0{"gate"}
+  G0 -- "no clear focus" --> ASK(["Proposes a narrower scope and asks"])
+  G0 --> F1["F1 Silhouette: read the sources and what they promise"]
+  F1 --> G1{"gate"} --> F2["F2 Model: systems, operators, state machines"]
+  F2 --> G2{"gate"} --> F3["F3 Verify: twelve checks, candidate findings"]
+  F3 --> G3{"gate"} --> F4["F4 Audit: re-read, refute, deduplicate, rate"]
+  F4 --> G4{"gate"} --> PR{"Previous report?"}
+  PR -- "yes" --> F5["F5 Reconcile with the previous report"] --> G5{"gate"} --> F6
+  PR -- "no" --> F6["F6 Report"]
+  F6 --> G6{"gate"} --> F7(["F7 Done: path, summary, top finding"])
+  G4 -. "still failing after two fixes" .-> INC(["Incomplete: the report says why"])
+```
+
+| Phase | What it does | What it writes | What blocks it |
+|---|---|---|---|
+| F0 Scope | Settles what is analyzed, the output mode, the language and where the report goes | `run.json` | A large scope with no focus |
+| F1 Silhouette | Reads every file in scope and lists what the docs, docstrings and constants promise | `sources.json` | A file in scope that was neither read nor excluded with a reason |
+| F2 Model | Describes the systems, operators and state machines the code actually builds | `model.json` | A transition no operator performs; a declared state missing from the model |
+| F3 Verify | Runs the twelve checks; every suspected defect becomes a candidate | `checks.json` | Fewer than twelve verdicts; "clean" without evidence |
+| F4 Audit | Re-reads each candidate's evidence, tries to refute it, merges duplicates, rates severity | `findings.json` | A quote that is not at the cited line; a candidate left unresolved |
+| F5 Reconcile | On a second run, classifies every earlier finding | `reaudit.json` | An earlier finding left unclassified; "resolved" without proof of the fix |
+| F6 Report | Writes the report from the records | `systemic-out/<scope>.md` | Counts or severities that differ from the records |
+| F7 Done | Confirms the run and replies in chat | — | — |
+
+**Why you can trust the result.** Every finding has to pass three tests
+before it reaches you. Its quoted evidence must still be at the cited line
+when the validator looks. A deliberate attempt to refute it must fail: is
+the guard in a caller, the dedup in a middleware, the ambiguity resolved two
+sections later? And the report must match the recorded findings exactly. The
+validator cannot tell whether a diagnosis is right — that is what the
+refutation step is for — but it guarantees that nothing in the report is
+uncited, unaudited or silently dropped.
+
+## What lands on your disk
+
+```
+your-project/
+└── systemic-out/
+    ├── orders-module.md      ← the report: read this
+    └── orders-module/        ← the run workspace
+        ├── run.json          scope, mode, language, status
+        ├── sources.json      files read, with hashes, and declared promises
+        ├── model.json        systems, operators, state machines
+        ├── checks.json       twelve verdicts and candidate findings
+        ├── findings.json     confirmed, rejected and merged candidates
+        ├── reaudit.json      only on a second run
+        └── *.md / work.md    the reasoning log of each phase
+```
+
+- **The report** is the deliverable. It is plain Markdown with relative
+  `file:line` references, so you can commit it, review it in a pull request
+  or share it.
+- **The workspace** is what makes the next run a re-audit, and lets you see
+  why a candidate was rejected or where a severity came from. If a run is
+  interrupted, it resumes from there.
+- **Committing.** Most teams commit the report, if anything, and ignore the
+  workspace: add `systemic-out/*/` to your `.gitignore`. Deleting the
+  workspace is safe; the next run on that scope is then treated as a first
+  audit.
 
 ## What it checks
 
@@ -107,49 +184,39 @@ and concurrency.
 | 11 | **System limits** | Requirements outside the representable set — the hacks are the evidence. |
 | 12 | **Feedback loops** | Retries feeding queues feeding retries, with no damper. |
 
-It applies the ones your material supports honestly, and states which did not
-apply and why.
+Every check gets a verdict on every run: **findings**, **clean** (with what
+was verified) or **not verifiable** (with what was missing). Missing material
+is never reported as clean.
 
-## What you get
+## Output modes
 
-A Markdown file on your disk — `systemic-out/<scope>.md` — with two output
-modes. **`functional` is the default; `full` retains the detailed systemic
-format.** Both perform the same modeling, twelve checks, evidence review and
-refutation. The difference is the explanation presented to the reader.
+**`functional` is the default; `full` adds the systemic detail.** Both run
+the same eight phases on the same evidence. Only the report differs.
 
 | Content | `functional` (default) | `full` |
 |---|---|---|
 | What fails, when and its functional impact | Yes, in everyday language | Yes, with systemic diagnosis |
 | Evidence, severity, confidence and corrective action | Yes | Yes |
 | Re-audit history and unverified behavior | Yes | Yes |
-| Systems, objectives, elements and operators | Internal analysis only | Reported inventory |
-| State diagrams and state × operator matrices | Internal analysis only | Included when applicable |
-| GST theory and numbered check diagnosis | Omitted | Included |
-| Twelve-check coverage | Performed internally; material limits reported | Full verdict table |
+| Systems, elements and operators | In the workspace only | In the report |
+| State diagrams and state × operator matrices | In the workspace only | In the report |
+| GST theory and the check behind each finding | Omitted | Included |
+| Twelve-check coverage | In the workspace; material limits in the report | Full verdict table |
 
-### Choose the output mode
+Choose it in plain words; these are not CLI flags:
 
 ```text
 /systemic audit the order lifecycle in src/orders
-/systemic audit the order lifecycle in src/orders, output functional
 /systemic audit the order lifecycle in src/orders, output full
 ```
 
-The first two produce `functional`; the third produces `full`. These are
-natural-language skill requests, not CLI flags. Asking for a thorough or
-systemic audit alone does not select `full`.
+The first produces `functional`, the second `full`. Asking for a thorough or
+systemic audit alone does not select `full`, and a previous report's mode does
+not carry over.
 
-In `functional`, a finding explains that retrying a refund can record it twice,
-which operation is affected, what condition enables it and what to correct.
-It does not teach closure or operator theory. Findings retain source evidence
-and unverified impact; this mode does not hide independent problems to shorten
-the report.
+## Reading a finding
 
-In `full`, the same finding additionally names the violated systemic property,
-shows the relevant lifecycle and supplies the complete check-coverage table.
-Changing mode does not reset the scope's re-audit history.
-
-### Every finding is labeled for honesty
+Every finding carries one honesty label:
 
 | Label | Means |
 |---|---|
@@ -160,31 +227,103 @@ Changing mode does not reset the scope's re-audit history.
 Severity is `critical` / `high` / `medium` / `low`, rated by the damage the
 finding actually causes. Critical requires supported severe material loss,
 irreversibility or persistent corruption with severe impact; a monetary
-domain or invalid value alone is insufficient. Reports distinguish impact
-from confidence and explicitly identify impact that could not be verified.
+domain or invalid value alone is not enough. **Confidence** (high / medium /
+low) is separate from severity: it says how well the diagnosis is supported,
+not how bad it is.
 
-**The honesty rule is non-negotiable**: no finding without evidence actually
-read. Every claim cites `file:line` or a document section. If it cannot be
-evidenced, it is not reported.
+A `functional` finding looks like this:
 
-### Findings are audited before they are reported
+```markdown
+### [high] [RISK] A retried payment webhook is counted twice
+- **What happens and when**: when the provider redelivers the same event,
+  the payment is recorded again and the amount is added a second time.
+- **Functional impact**: total_paid exceeds what the customer paid; an order
+  can be marked paid on the strength of a duplicate.
+- **Evidence and confidence**: `webhook.py:9`, `webhook.py:10`; high, direct
+  source evidence plus a trace of a second delivery.
+- **Recommended action**: ignore events whose id is already recorded before
+  changing any total.
+```
 
-Every draft finding passes three gates. Its evidence is **re-read** at the
-cited location. A **refutation** is actively attempted — is the guard in a
-caller? the dedup in a middleware? the ambiguity resolved two sections later?
-Rejected candidates keep their refuting evidence in the analysis. `full` lists
-them; `functional` mentions them only when they affect a practical decision.
-Findings are **deduplicated by root cause**: one finding per
-defect, however many checks it trips and however many call sites repeat it.
-Sharing a recommendation does not merge independent defects: an isolated fix
-that leaves the other failure reproducible establishes separate repair points.
-The presence of middleware is verified on failure paths as well as success.
+The summary always opens with a count line such as
+`critical: 0 · high: 6 · medium: 2 · low: 0`. The labels, severities and
+count keywords stay in English in every language, so reports remain
+comparable and greppable across projects.
 
-Run it twice and the second report is a re-audit: every finding classified
-**new**, **persisting**, **resolved** or **not verified** against the previous
-run. Resolution requires current evidence of correction or an explicit
-contract change; moving code to an unavailable service leaves an unverified
-antecedent. All four status counts are reported, including zeros.
+## Re-audits
+
+Run it again on the same scope and the second report is a re-audit. Every
+earlier finding is classified, and all four counts are reported, including
+zeros:
+
+- **new** — found now, absent before.
+- **persisting** — the same root cause, re-verified against today's code
+  rather than copied.
+- **resolved** — current evidence shows the fix, or an explicit contract
+  change makes the old requirement inapplicable. A moved file or a stale
+  line number is not a fix.
+- **not verified** — it can be neither confirmed nor ruled out with the
+  material in scope, for example because the behavior moved to a service you
+  did not include. The report keeps its last evidence and says what would
+  verify it. It is not counted as a current finding.
+
+Findings are matched by a fingerprint derived from their root cause, so
+renaming a title does not break the history. Reports written before this
+version have no workspace; they are still recognized and reconciled from the
+Markdown. Changing the output mode does not reset the history.
+
+## Run profiles and cost
+
+Systems thinking is not free. A run reads every file in scope, builds a model
+and audits each candidate, so it takes longer and uses more tokens than a
+code review. The skill picks a profile from the size of the scope:
+
+- **quick** — about six files or fewer, or a single lifecycle. The same
+  records and gates; the reasoning goes into one `work.md` log.
+- **standard** — larger scopes. One log per phase. When the environment
+  supports subagents and there are many candidates, an independent verifier
+  that never saw the modeling audits the evidence.
+
+You can ask for one: "…, use the quick profile". Profiles change cost, never
+the evidence required.
+
+## When a run does not finish
+
+- **It asks you to narrow the scope.** The target was a large repository
+  with no focus. Answer with the module or lifecycle you care about; it
+  usually proposes the one with the most state.
+- **The report says the run is incomplete.** A phase kept failing its
+  validator after two corrections — typically because a source file changed
+  during the run, or the material cannot support a required record. The first
+  section of the report names the phase and the reason. Fix the cause (stop
+  editing the files in scope, add the missing files to the scope) and run it
+  again.
+- **"Gates checked manually."** Python was not available. The run is valid,
+  but the deterministic checks were applied by the model rather than by the
+  validator. Install Python 3.9+ to get the automatic checks.
+
+You can run the validator yourself at any time:
+
+```sh
+python3 ~/.claude/skills/systemic/scripts/systemic_check.py all systemic-out/orders-module
+```
+
+## Language
+
+The report is written in the language you ask for. Name one and it wins;
+otherwise it follows the language you are writing in. Only the fixed keywords
+— labels, severities, count keywords and coverage verdicts — stay in English.
+
+## What it is not
+
+- **Not a linter.** It reads for meaning, not patterns. It will not find your
+  unused imports, and it will find that your README forbids what your code
+  permits.
+- **Not a security scanner.** Use one; they are complementary.
+- **Not for trivial apps.** It targets systems with real state —
+  lifecycles, workflows, sagas, anything with a `status` column — where an
+  inconsistency costs money. The report recommends new components only when
+  the benefit justifies them.
 
 ## A full-mode example
 
@@ -199,8 +338,8 @@ the `full` report reads the matrix like this:
 > The function `is_final()` exists and **no operator calls it**. The system
 > declares the notion of a final state and never uses it.
 
-And it closes by naming the one missing piece that dissolves nine of the
-fourteen findings at once:
+And it closes by naming the one missing piece that dissolves most of the
+findings at once:
 
 > Every operation writes `order.status` directly. That means the state machine
 > **is implemented nowhere** — it exists as prose in the README and as a set
@@ -210,112 +349,87 @@ fourteen findings at once:
 
 That is the difference from a code review. A review says *a guard is missing
 on line 30*. This says *the machine is unimplemented, here is the piece, and
-here are the nine findings it makes disappear*.
+here are the findings it makes disappear*.
 
-## What it is not
+A complete, validated example run — report and workspace — is in
+[`evals/fixtures/runs/orders-valid/systemic-out/`](evals/fixtures/runs/orders-valid/systemic-out/).
 
-- **Not a linter.** It reads for meaning, not patterns. It will not find your
-  unused imports, and it will find that your README forbids what your code
-  permits.
-- **Not a security scanner.** Use one; they are complementary.
-- **Not free.** Systems thinking is expensive and is not aimed at trivial
-  apps. It targets systems with real state — lifecycles, workflows, sagas,
-  anything with a `status` column — where an inconsistency costs money. The
-  report reflects that judgment and recommends new components only when the
-  benefit justifies them.
-
-## Language
-
-The report is written in the language you ask for. Name one and it wins;
-otherwise it follows the language you are writing in. Only the honesty labels
-and the severities stay as fixed keywords in every language, so reports stay
-comparable and greppable across projects.
-
-## Layout
+## Repository layout
 
 ```
-SKILL.md                      shared analysis, mode selection and rules
+SKILL.md                      the eight phases, shared rules, labels and severity
 references/
-  gst-framework.md            the conceptual vocabulary, loaded before phase 1
-  checks.md                   how to detect each of the 12, loaded in phase 2
+  run-contracts.md            the exact shape of every file a run writes
+  gst-framework.md            the conceptual vocabulary (read in F2)
+  checks.md                   how to detect each of the twelve checks (read in F3)
   output-functional.md        functional report format (default)
   output-full.md              detailed systemic report format
+scripts/
+  systemic_check.py           the gate validator (Python 3.9+, standard library)
 evals/
-  evals.json                  13 evals with assertions
-  fixtures/orders/            a code module with 9 seeded defects
-  fixtures/rental-doc/        a design document with 7 seeded flaws
+  evals.json                  14 forward evals with assertions
+  test_systemic_check.py      validator tests: one contract violation per test
+  test_adversarial_fixtures.py executable counterexamples for the fixtures
+  fixtures/orders/            a code module with seeded defects
+  fixtures/rental-doc/        a design document with seeded flaws
   fixtures/booking-saga/      a compensating saga: partial failure and loops
   fixtures/clean-ticket/      a correct lifecycle: the false-positive control
   fixtures/guarded-elsewhere/ defended paths plus refund/recovery defects
-  fixtures/rerun/             a previous report: seeds the re-audit eval
-  fixtures/rerun-external/    a missing successor: unverified re-audit
   fixtures/independent-ledgers/ separate causes and bounded impact
-  test_adversarial_fixtures.py executable fixture counterexamples
+  fixtures/rerun/             a previous Markdown-only report (legacy re-audit)
+  fixtures/rerun-external/    a missing successor: unverified re-audit
+  fixtures/rerun-json/        a previous run with findings.json (fingerprint re-audit)
+  fixtures/runs/orders-valid/ a complete valid run: the validator's golden case
 ```
 
-## Evals
+## Evals and tests
 
-`evals/evals.json` holds thirteen cases with explicit assertions:
+There are two kinds of tests.
 
-1. **seeded-defects-code** — 9 planted flaws in a Python module, self-contained.
-2. **design-doc-only** — a design document with no code; verifies the skill
-   cites only document sections and invents no code paths.
-3. **real-repo-lifecycle** — a template; supply your own repo and lifecycle.
-4. **explicit-report-language** — a Spanish prompt requesting an English
-   report; verifies the explicit request wins and the labels stay untranslated.
-5. **saga-compensations-and-loops** — a saga with compensations; exercises
-   checks 6 and 12, including conditional timeout behavior without inventing
-   a latency distribution.
-6. **clean-code-no-false-positives** — a deliberately correct module. Every
-   other fixture rewards finding things; this one is graded on what the skill
-   does **not** report. A run that "finds more" here is a worse run.
-7. **guarded-elsewhere-refutation** — four apparent defects, each defended in
-   another layer (a decorator, a middleware, a guarding caller, a
-   synchronized total). Rejects false absence-of-defense claims while finding
-   independent refund replay, refund eligibility and failed-payment recovery
-   defects, plus conditional drift through retained mutable line items.
-   Additional evidence-backed findings are permitted.
-8. **re-audit-diff** — a second run over the orders module with a previous
-   report in place; verifies findings come out classified new / persisting /
-   resolved / not verified, with positive evidence required for resolution.
-9. **re-audit-unavailable-successor** — behavior moved to an unavailable
-   external service; the old finding remains not verified, not resolved.
-10. **independent-causes-and-bounded-impact** — independent wallet/loyalty
-   defects, a valid historical snapshot and severity calibrated to demonstrated
-   impact. Similar repairs must not collapse independent roots.
-
-11. **default-functional-output** — no mode specified: functional impact,
-    evidence and actions, without theory or modeling artifacts.
-12. **explicit-full-output** — explicitly selects the detailed format for the
-    same invoice fixture, preserving its functional findings.
-13. **functional-re-audit-from-full** — an older full report does not override
-    the default or erase an unverified antecedent.
-
-Substitute the skill's absolute path for `<SKILL_DIR>` when running them.
-Evals 8, 9 and 13 require seeding their previous report into the isolated working
-directory first; the setup is documented in `evals/evals.json`. Cases 1–10 explicitly request
-`full`; 11–13 exercise output selection and history across modes.
-
-Run the executable fixture counterexamples with:
+**Deterministic tests** need only Python:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -v
 ```
 
-These tests verify the fixtures' causal traces, not a model's report. Evaluate
-the skill itself with isolated forward runs against the case assertions.
+`test_systemic_check.py` copies the golden run, breaks one contract per test
+— a missing verdict, a quote moved off its line, a critical finding without
+its justification, a report count that disagrees with the records — and
+asserts that the right gate rejects it. `test_adversarial_fixtures.py`
+executes the defects planted in the fixtures, so the evals' ground truth is
+itself tested.
 
-Evals 6 and 7 are the ones that matter most as the skill changes. A tool that
-reports problems is only as useful as its false-positive rate, and every other
-eval pushes in the direction of reporting more. Eval 6 measures restraint —
-finding nothing where nothing is wrong; eval 7 measures discrimination —
-rejecting four defended traps without going blind to the defect beside them.
+**Forward evals** (`evals/evals.json`) run the skill on a fixture and grade
+the report and workspace against written assertions. To run one: copy the
+skill to an isolated location, substitute its absolute path for `<SKILL_DIR>`
+in the prompt, run the prompt from an empty working directory, and check each
+assertion. Evals 8, 9, 13 and 14 need a previous report seeded first; the
+setup is described in the `notes` field of `evals.json`. Cases 1–10 and 14
+request `full`; 11–13 exercise mode selection and history across modes.
+
+Evals 6 and 7 matter most as the skill changes. A tool that reports problems
+is only as useful as its false-positive rate, and every other eval pushes
+towards reporting more. Eval 6 measures restraint — finding nothing where
+nothing is wrong. Eval 7 measures discrimination — rejecting four defended
+traps without going blind to the defects beside them.
 
 ## Contributing
 
 The most useful contributions are **fixtures**: a lifecycle with a defect the
 skill misses, plus the assertion that should have caught it. A check that
 never fires on any fixture is a check nobody can trust.
+
+Other good contributions:
+
+- **A validator rule** for a contract that can be checked mechanically. Add
+  it to `scripts/systemic_check.py`, document it in
+  `references/run-contracts.md`, and add a mutation test that proves it
+  fires.
+- **A counterexample test** in `test_adversarial_fixtures.py` for a new
+  fixture's planted defect.
+
+Keep `README.md` and `README.es.md` in step: a change to one should land in
+both.
 
 ## License
 

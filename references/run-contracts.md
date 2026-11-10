@@ -164,6 +164,8 @@ rest of the previous workspace, including any older `prior/`.
   - `defined`: the operator performs a transition the declared rules allow
     from this state.
   - `guarded`: the operator refuses this state with an explicit check.
+    An operator that deliberately leaves this state untouched (a sweep that
+    filters it out, an idempotent no-op) is also `guarded`, with a note.
   - `hole`: the operator proceeds without considering this state, including
     a write the declared rules forbid.
   Every `hole` has a note naming a candidate or explaining it **[gate]**.

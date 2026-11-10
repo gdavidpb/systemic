@@ -43,7 +43,8 @@ back to F3 as a candidate, with the lines that explain it.
   makes a `high` confidence easy to defend.
 - **F5, confirming a classification.** Run the suite, or the one test, to
   confirm that a `detected` finding's test is red today and that an
-  `enshrined` one is green. Coverage levels are still decided by reading the
+  `enshrined` one is green. If F4 already needs that result for a
+  finding's confidence, run the suite then and reuse it in F5. Coverage levels are still decided by reading the
   assertion: a green test shows the assertion holds, not what it defends.
 - **F5, confirming `asserted`.** Break the invariant in a copy of the code
   and run the test cited for it: if it stays green, the level is `weak` and
@@ -52,15 +53,21 @@ back to F3 as a candidate, with the lines that explain it.
 
 ## How to execute safely
 
-- **Never change the analyzed project.** Work on a copy for anything that
-  writes or mutates code; run read-only traces without writing bytecode or
-  caches (`PYTHONDONTWRITEBYTECODE=1`, `python3 -I`, a temporary directory
-  as the working directory). The gates recompute every source hash, so a
-  run that changed a source fails G1 and goes back to F1.
-- **Keep what you write in the workspace**, under `<slug>/traces/`: one
-  small script per trace, named after the candidate it reproduces. The
-  report can point at them. `traces/` exists only when execution is allowed
-  **[gate]**.
+- **Never change the analyzed project.** Run read-only traces without
+  writing bytecode or caches (`python3 -B`; not `-I` together with
+  `PYTHONDONTWRITEBYTECODE`, which `-I` ignores). For anything that writes
+  or mutates code, work on a copy in a temporary directory and delete it
+  afterwards. The gates recompute every source hash, so a run that changed
+  a source fails G1 and goes back to F1.
+- **Keep the scripts in the workspace**, under `<slug>/traces/`, written by
+  F4 and F5: one small script per trace, named after the behavior it
+  reproduces (`sweep_deletes_a_sold_unit.py`), not after an internal id, so
+  a `functional` report can point at it. `traces/` is optional, and exists
+  only when execution is allowed **[gate]**.
+- **A forced overlap shows possibility, not frequency.** Holding one
+  operation between its read and its write to let another through proves
+  the interleaving can happen. It says nothing about how often; the
+  finding stays a RISK with that condition.
 - **No side effects beyond the process.** No network, no real database or
   queue, no external service, no installs, no migrations, no deploy or
   release step. Replace a dependency with a local double, or leave that

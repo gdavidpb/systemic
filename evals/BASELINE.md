@@ -98,6 +98,15 @@ three ended `complete` with `systemic_check.py all` passing.
 | 9 re-audit | `references/reaudit.md` | The antecedent is `not verified` and outside the severity totals; counts `new: 1 · persisting: 0 · resolved: 0 · not verified: 1`. It also reported one new `low` finding in the façade's own validation, which the case's "does not invent a new concrete defect" assertion may or may not allow |
 | 21 resume | `references/run-protocol.md` | Logged `resumed`, ran `all`, logged the failure under F1, returned to F1 with the reason, rebuilt F1–F8; no finding says a shipped order can be canceled |
 
+## The execution capability (eval 26)
+
+Added after the runs above, and run once with the skill. The request allowed
+running the code and the tests.
+
+| Eval | Outcome | Tokens | Time |
+|---|---|---|---|
+| 26 `stock-reservations`, execution allowed | 11 / 11 assertions; `systemic_check.py all` passes; no gate failed. `execution: allowed` with an explicit source; nine finding traces, the suite and thirteen mutated copies executed; scripts kept under `traces/`; every fixture file byte for byte unchanged, no cache left behind. The snapshot, mock and fake-concurrency tests are green and still not credited | 227k | 16.7 min |
+
 ## How to reproduce
 
 1. Copy `SKILL.md`, `references/`, `scripts/` and only the case's fixture to

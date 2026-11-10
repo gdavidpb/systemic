@@ -155,7 +155,10 @@ rest of the previous workspace, including any older `prior/`.
   in scope cannot settle it either way (the behavior is delegated to a
   service outside the scope, the claim is about a property no file shows).
   An unverified claim is not a divergence: it produces no candidate, and
-  `full` lists it under its limits.
+  `full` lists it under its limits. A finding may still rest on one as a
+  stated premise (a severity that depends on "this table is the only
+  record of a sale"): its impact says the rating depends on that
+  declaration and what would change it.
 - `invariants` is the catalog of `references/invariants.md`. Each has a
   unique `I-n`, a `category` among `state`, `transition`, `logical`,
   `temporal`, `repetition`, `concurrency`, `atomicity`, `algebraic`, a

@@ -137,6 +137,12 @@ class G0Scope(GateTestCase):
             {"phase": "F1", "event": "returned_to", "detail": "operations.py changed since it was read"}))
         self.assertFails("ALL", "no later gate_passed shows it was redone")
 
+    def test_redone_phase_log_records_the_return(self):
+        self.ws.edit("run.json", lambda d: d["log"].extend([
+            {"phase": "F1", "event": "returned_to", "detail": "operations.py changed since it was read"},
+            {"phase": "F1", "event": "gate_passed", "detail": "G1"}]))
+        self.assertFails("ALL", "returned_to: <reason>")
+
     def test_log_events_are_fixed_keywords(self):
         self.ws.edit("run.json", lambda d: d["log"].append({"phase": "F2", "event": "done", "detail": "x"}))
         self.assertFails("ALL", "event must be one of")
@@ -387,6 +393,42 @@ class G4Findings(GateTestCase):
     def test_finding_states_what_impact_is_not_verified(self):
         self.ws.edit("findings.json", lambda d: d["confirmed"][0]["impact"].update(not_verified=None))
         self.assertFails("G4", "not_verified")
+
+    def test_missing_guards_on_one_machine_are_one_finding(self):
+        def split(d):
+            twin = dict(d["confirmed"][2], fingerprint="operations.py:cancel:completeness:no-guard",
+                        title="cancel ignores the current state")
+            d["merged"] = [m for m in d["merged"] if m["candidate"] != "C-9"]
+            twin["candidate"] = "C-9"
+            d["confirmed"].append(twin)
+        self.ws.edit("findings.json", split)
+        self.ws.edit("checks.json", lambda d: next(c for c in d["candidates"] if c["id"] == "C-9")
+                     .update(refs=["T-3"]))
+        self.assertFails("G4", "are one finding unless")
+
+    def test_grouping_also_follows_operator_refs(self):
+        def split(d):
+            twin = dict(d["confirmed"][2], fingerprint="operations.py:ship:completeness:no-guard",
+                        title="ship ignores the current state", candidate="C-9")
+            d["merged"] = [m for m in d["merged"] if m["candidate"] != "C-9"]
+            d["confirmed"].append(twin)
+        self.ws.edit("findings.json", split)
+        self.ws.edit("checks.json", lambda d: next(c for c in d["candidates"] if c["id"] == "C-9")
+                     .update(refs=["O-8"]))
+        self.assertFails("G4", "are one finding unless")
+
+    def test_a_justified_second_finding_on_the_machine_passes(self):
+        def split(d):
+            twin = dict(d["confirmed"][2], fingerprint="operations.py:mark_paid:completeness:no-amount-check",
+                        title="mark_paid never checks the amount paid", candidate="C-9",
+                        separate_because="The amount check is a rule outside the transition table; a table would still let an underpaid order through")
+            d["merged"] = [m for m in d["merged"] if m["candidate"] != "C-9"]
+            d["confirmed"].append(twin)
+        self.ws.edit("findings.json", split)
+        self.ws.edit("checks.json", lambda d: next(c for c in d["candidates"] if c["id"] == "C-9")
+                     .update(refs=["T-2"]))
+        code, out = self.ws.check("G4")
+        self.assertEqual(code, 0, out)
 
     def test_critical_requires_scope_and_irrecoverability(self):
         self.ws.edit("findings.json", lambda d: d["confirmed"][0].update(severity="critical"))

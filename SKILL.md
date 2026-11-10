@@ -111,7 +111,8 @@ names one. A profile changes cost, never the evidence bar.
    across context compaction and lets an interrupted run resume at
    `run.json.phase`. To resume, log a `resumed` event under the phase in
    `run.json`, then run `systemic_check.py all <workspace>` before anything
-   else, logging its result as one entry under the earliest failing phase: a source that
+   else, logging its result right after `resumed` as one entry under the
+   earliest failing phase: a source that
    changed since F1, or any earlier gate that no longer passes, sends the
    run back to the earliest failing phase as rule 2 says. Redo means
    rebuilding that phase's files from its inputs, keeping stable ids where
@@ -123,9 +124,12 @@ names one. A profile changes cost, never the evidence bar.
    part of the same run, not a fresh one), and redo it and everything after
    it: rebuild each phase's files from its inputs rather than editing them
    in place. In the quick profile, keep the `work.md` sections of the
-   phases before the one returned to and rewrite the rest. Never patch an
+   phases before the one returned to and rewrite the rest. The redone
+   phase's log opens with a line `returned_to: <reason>` (a fixed keyword,
+   in every language) **[gate]**. Never patch an
    earlier file silently.
-3. **Gates.** After writing a phase's files, run
+3. **Gates.** After writing a phase's files and its log (the phase log,
+   or its `work.md` section), run
    `python3 <skill-dir>/scripts/systemic_check.py <gate> <workspace>`. Fix
    the reported violations inside the same phase and run it again, at most
    two corrections. If it still fails — or at once, when every fix would
@@ -351,10 +355,13 @@ itself a system, and this phase is its consistency check.
     table exists (writing an undeclared state is closure, not a missing
     guard). A hole that needs an operator that does not exist (a review
     step nothing performs) belongs to the finding about that missing
-    operator. This rule is the isolated-repair test applied to a machine —
+    operator, recorded under that finding's own check (usually 4,
+    reachability), not under 3. This rule is the isolated-repair test applied to a machine —
     the shared repair is the transition function — so it wins over
     keeping each operator separate. Record the finding under check 3 and
-    list the other checks among its manifestations.
+    list the other checks among its manifestations. A second check-3
+    finding on the same machine needs `separate_because`: the rule or
+    defect that the transition table would not fix **[gate]**.
   - **4d Severity and confidence.** Rate each surviving finding against the
     rubric below (the damage it causes, not the check's typical ceiling) and
     give it a fingerprint derived from its root cause.

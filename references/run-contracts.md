@@ -203,6 +203,9 @@ rest of the previous workspace, including any older `prior/`.
 
 - Every candidate ends in exactly one of `confirmed` (as its `candidate`),
   `rejected` or `merged` **[gate]**.
+- Check-3 findings whose candidates (or merged candidates) reference
+  transitions of the same machine are one finding; any further one carries
+  `separate_because` *(text)* **[gate]**.
 - `fingerprint`: `<file>:<operator or field>:<property>:<defect>`, lowercase,
   `[a-z0-9._:/-]` **[gate]**. Derive it from the root cause, not from the
   title or the wording, so the same defect gets the same fingerprint on the

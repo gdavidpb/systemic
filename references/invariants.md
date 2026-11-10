@@ -44,15 +44,22 @@ paused order is eventually resumed or canceled" is `temporal`.
   implies a `state` invariant; every guard and every declared forbidden
   transition implies a `transition` invariant; every terminal state implies a
   `temporal` one ("never left"); every re-invokable entry point implies a
-  `repetition` one; every multi-write operation implies an `atomicity` one;
+  `repetition` one; every operation that writes to two places that can fail
+  independently (two tables, a table and an external call, a file and a
+  queue) implies an `atomicity` one — several fields of one in-memory object
+  updated in sequence do not;
   every pair of dual operators implies an `algebraic` one.
 - Every machine has at least one invariant. Keep the catalog to the
   properties that matter for the scope: one invariant per rule, not one per
   line. An invariant the code already violates belongs in the catalog all the
   same — it is what the tests should be defending.
 - A category with nothing in scope stays empty. Do not invent a concurrency
-  invariant for a module nothing runs concurrently; the empty row in the
-  report is itself information.
+  invariant for a module nothing runs concurrently, or an atomicity one for
+  a module with no second system to fail; the empty row in the report is
+  itself information.
+- A rule that states two properties ("set by assign and cleared only by
+  unassign") becomes two invariants when a test could catch one and miss the
+  other.
 
 ## Recognizing the technique of a test (F5)
 
@@ -62,7 +69,7 @@ Read the test, not its name. Classify by what the test body does:
 |---|---|
 | `example` | One setup, one operation, assertions on the result |
 | `sequence` | Several operations in a meaningful order, with assertions along or after the trace; a fake clock to test deadlines |
-| `property` | Generated inputs (Hypothesis, fast-check, QuickCheck, jqwik, table-driven loops over a whole domain) with a universal assertion |
+| `property` | Generated inputs (Hypothesis, fast-check, QuickCheck, jqwik) or a loop over a whole domain — every state, every action, every sequence up to a length — with a universal assertion. An exhaustive loop over operation sequences is `property`, not `sequence`. |
 | `stateful` | Generated sequences of operations against a model (`RuleBasedStateMachine`, model-based testing) |
 | `repetition` | The same operation or event applied twice or more, including a retry after a failed first attempt and a delayed replay |
 | `concurrency` | Threads, tasks or transactions forced to interleave (barriers, latches, two sessions on the same row) |
@@ -73,9 +80,11 @@ Read the test, not its name. Classify by what the test body does:
 
 Each invariant gets exactly one level:
 
-- **asserted** — a test contains an assertion that would fail if the
-  invariant were violated, and its technique is one that can catch that
-  category. Cite the assertion line.
+- **asserted** — a test contains an assertion that would fail on any
+  plausible violation of the invariant, and its technique is one that can
+  catch that category. Cite the assertion line. If some plausible violation
+  would still pass (the assertion checks one half of the rule), the level is
+  `weak` and `reason` names the violation that would slip through.
 - **weak** — tests exercise the operators involved, but no assertion would
   fail on a violation, or the technique cannot reach it. Typical cases: the
   happy path of a guard (cancel tried only from an allowed state); an
@@ -110,6 +119,14 @@ Before you mark an invariant `asserted`, rule these out:
   state, or it may not.
 - **Helpers with assertions.** An assertion inside a helper counts; cite the
   helper's line and the test that calls it.
+- **An oracle taken from the code under test.** A test whose expected values
+  come from the implementation (`expected = TRANSITIONS.get(...)`) proves the
+  code agrees with itself. It asserts invariants about the table's
+  consequences, not that the table matches the specification.
+- **Concurrency without an interleaving.** Submitting two requests to a
+  thread pool and waiting for the first before sending the second is a
+  sequence. A concurrency test forces the overlap (a barrier, a latch, a
+  patched read that yields).
 
 Search before you conclude `uncovered`: helpers, fixtures, parametrizations,
 conftest files, base classes and test utilities in other directories.
@@ -121,9 +138,14 @@ For every confirmed finding of F4, record what the suite does about it:
 - **detected** — a test asserts the correct behavior and fails today because
   of this defect.
 - **undetected** — no test would fail because of it. Say what is missing.
-- **enshrined** — a test asserts the defective behavior and passes because of
-  it: fixing the defect turns the suite red. This is the most expensive kind
-  of gap, because it tells whoever fixes the bug that they broke something.
+- **enshrined** — a test **asserts** the defective behavior and passes because
+  of it: fixing the defect turns the suite red. This is the most expensive
+  kind of gap, because it tells whoever fixes the bug that they broke
+  something. A test that only relies on the defect in its setup (it calls an
+  unguarded operator to reach a state) without asserting it does not
+  enshrine it: classify the finding `undetected` and name that test in the
+  note, since the fix will need to touch it. When a `coverage` entry is
+  `contradicted` through a finding, that finding is `enshrined` **[gate]**.
 
 These are coverage records, not new findings: they never change a finding's
 severity or the count line.

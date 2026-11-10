@@ -5,7 +5,7 @@ theoretical diagnosis. Translate headings and prose into the report's language;
 honesty labels and severities remain the shared fixed keywords.
 
 Render it from `findings.json`, `checks.json`, `model.json`, `tests.json`
-and, on a re-audit, `reaudit.json`, never from memory. Gate G6 checks the result
+and, on a re-audit, `reaudit.json`, never from memory. Gate G7 checks the result
 against those records; see `references/run-contracts.md`.
 
 ```markdown
@@ -38,7 +38,7 @@ operator matrix from checks.json.>
   conditions and impact not verified; confidence high/medium/low with its basis>
 - **Recommendation**: <concrete action>
 
-<For a re-audit, include the two tables defined in SKILL.md F6, even if
+<For a re-audit, include the two tables defined in SKILL.md F7, even if
 one is empty: Resolved since last report | previous finding | evidence of
 the fix |, and Not verified | previous finding | last verified evidence |
 what changed | what is needed |.>

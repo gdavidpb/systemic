@@ -8,7 +8,7 @@ retain independent findings, severity, honesty labels, evidence, conditions,
 confidence and unverified antecedents.
 
 Render it from `findings.json`, `tests.json` (and `reaudit.json` on a
-re-audit), never from memory. Gate G6 checks the result against those records; see
+re-audit), never from memory. Gate G7 checks the result against those records; see
 `references/run-contracts.md`.
 
 Use this structure, translating headings and prose into the report's language:
@@ -67,7 +67,7 @@ No twelve-check coverage table or theoretical limits discussion.>
 Each confirmed finding gets exactly one such heading, with its recorded
 severity and label. Test gaps never get a heading of their own: they
 live in the tests section and never change the count line. Do not add a `**Check**` line, a mermaid block or a
-twelve-row coverage table; G6 rejects them in this mode.
+twelve-row coverage table; G7 rejects them in this mode.
 
 If there are no verified findings, say so, identify the behavior checked and
 keep the pending-verification section. Never invent findings or a

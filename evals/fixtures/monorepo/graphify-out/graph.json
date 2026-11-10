@@ -1,0 +1,19 @@
+{
+  "generated_by": "graphify",
+  "nodes": [
+    {"id": "billing/subscriptions.py", "kind": "file", "symbols": ["Subscription", "STATUS", "activate", "charge_failed", "cancel"], "state_fields": ["status", "trial_ends", "paid_through", "failed_charges"]},
+    {"id": "billing/dunning.py", "kind": "file", "symbols": ["on_renewal_failed", "MAX_FAILURES"], "state_fields": []},
+    {"id": "catalog/products.py", "kind": "file", "symbols": ["Product"], "state_fields": []},
+    {"id": "catalog/prices.py", "kind": "file", "symbols": ["RATES", "convert"], "state_fields": []},
+    {"id": "notifications/email.py", "kind": "file", "symbols": ["send"], "state_fields": []},
+    {"id": "search/query.py", "kind": "file", "symbols": ["parse"], "state_fields": []},
+    {"id": "search/rank.py", "kind": "file", "symbols": ["rank"], "state_fields": []},
+    {"id": "shared/text.py", "kind": "file", "symbols": ["normalize", "render"], "state_fields": []}
+  ],
+  "edges": [
+    {"source": "billing/dunning.py", "target": "billing/subscriptions.py", "relation": "imports"},
+    {"source": "notifications/email.py", "target": "shared/text.py", "relation": "imports"},
+    {"source": "search/query.py", "target": "shared/text.py", "relation": "imports"},
+    {"source": "search/rank.py", "target": "catalog/products.py", "relation": "reads"}
+  ]
+}

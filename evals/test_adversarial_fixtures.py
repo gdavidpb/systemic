@@ -173,6 +173,88 @@ class AdversarialFixtures(unittest.TestCase):
                 self.assertEqual(len(enqueued), expected_retries)
 
 
+class StockReservations(unittest.TestCase):
+    def setUp(self):
+        from datetime import datetime, timedelta
+        self.models, self.operations = fixture("stock-reservations", "models", "operations")
+        self.t0 = datetime(2026, 1, 1, 12, 0)
+        self.later = lambda minutes: self.t0 + timedelta(minutes=minutes)
+
+    def store_with(self, *serials):
+        store = self.models.Store()
+        for serial in serials:
+            store.put(self.models.Unit("SKU-1", serial))
+        return store
+
+    def test_interleaved_reservations_both_succeed(self):
+        store = self.store_with("u1")
+        snapshot = store.get("u1")
+        stale = types.SimpleNamespace(get=lambda serial: self.models.replace(snapshot),
+                                      put=store.put)
+        # Both requests read the row before either writes it.
+        self.operations.reserve(stale, "u1", "ana", self.t0)
+        self.operations.reserve(stale, "u1", "bob", self.t0)
+        self.assertEqual(store.get("u1").reserved_by, "bob")
+
+    def test_declined_payment_leaves_the_unit_sold(self):
+        store = self.store_with("u1")
+
+        class Declining:
+            def charge(self, shopper, sku):
+                raise RuntimeError("declined")
+
+        self.operations.reserve(store, "u1", "ana", self.t0)
+        with self.assertRaises(RuntimeError):
+            self.operations.sell(store, "u1", "ana", Declining(), self.t0)
+        self.assertIsNotNone(store.get("u1").sold_at)
+
+    def test_sweep_deletes_the_only_record_of_a_sale(self):
+        store = self.store_with("u1", "u2")
+        self.operations.reserve(store, "u1", "ana", self.t0)
+        self.operations.sell(store, "u1", "ana", types.SimpleNamespace(charge=lambda *a: None), self.t0)
+        self.operations.reserve(store, "u2", "bob", self.t0)
+        self.operations.sweep(store, self.later(20))
+        self.assertEqual(store.all(), [])
+
+    def test_a_sold_unit_changes_hands_after_its_window(self):
+        store = self.store_with("u1")
+        self.operations.reserve(store, "u1", "ana", self.t0)
+        self.operations.sell(store, "u1", "ana", types.SimpleNamespace(charge=lambda *a: None), self.t0)
+        self.operations.reserve(store, "u1", "bob", self.later(16))
+        unit = store.get("u1")
+        self.assertEqual((unit.reserved_by, unit.sold_at), ("bob", self.t0))
+
+    def test_bundle_price_is_a_special_case(self):
+        unit = self.models.Unit("BUNDLE-1", "u1")
+        catalog = {"BUNDLE-1": 30.0, "BUNDLE-1:parts": ["A", "B", "C"]}
+        self.assertEqual(self.operations.price_of(unit, catalog), 10.0)
+
+
+class MonorepoBilling(unittest.TestCase):
+    def setUp(self):
+        self.subs, self.dunning = fixture("monorepo/billing", "subscriptions", "dunning")
+
+    def test_a_failed_renewal_revives_a_canceled_subscription(self):
+        sub = self.subs.Subscription("s-1")
+        self.subs.cancel(sub)
+        self.dunning.on_renewal_failed(sub)
+        self.assertEqual(sub.status, "past_due")
+
+    def test_old_failures_survive_a_successful_renewal(self):
+        sub = self.subs.Subscription("s-1")
+        for _ in range(2):
+            self.dunning.on_renewal_failed(sub)
+        self.subs.activate(sub, paid_through=None)
+        self.dunning.on_renewal_failed(sub)
+        self.assertEqual(sub.status, "canceled")
+
+    def test_nothing_reads_trial_ends(self):
+        for name in ("subscriptions.py", "dunning.py"):
+            source = (FIXTURES / "monorepo" / "billing" / name).read_text(encoding="utf-8")
+            self.assertNotIn("trial_ends <", source)
+            self.assertNotIn("sub.trial_ends", source)
+
+
 class FixtureSuites(unittest.TestCase):
     """The test suites planted in fixtures, which the test-audit phase reads."""
 
@@ -208,6 +290,13 @@ class FixtureSuites(unittest.TestCase):
         self.assertEqual(order.total_paid, 40.0)
         source = (FIXTURES / "orders" / "test_orders.py").read_text(encoding="utf-8")
         self.assertEqual(source.count("handle_payment_webhook(order"), 1)
+
+    def test_stock_suite_catches_exactly_the_charge_ordering_defect(self):
+        result = self.run_suite("stock-reservations", "test_stock")
+        self.assertEqual(result.testsRun, 10)
+        self.assertEqual(result.errors, [])
+        failed = [test.id().rsplit(".", 1)[-1] for test, _ in result.failures]
+        self.assertEqual(failed, ["test_declined_payment_keeps_the_unit_reserved"])
 
     def test_clean_ticket_suite_is_green(self):
         result = self.run_suite("clean-ticket", "test_tickets")

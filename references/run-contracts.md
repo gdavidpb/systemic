@@ -15,7 +15,8 @@ systemic-out/
     ├── reaudit.json    F6, only when a previous report exists
     ├── prior/          F0, only on a re-audit: report.md (+ findings.json)
     └── 00-scope.md … 06-reaudit.md   phase logs (profile standard)
-        or work.md                    single log (profile quick)
+        or work.md                    single log (profile quick), one
+                                      `## F<n>` section per finished phase **[gate]**
 ```
 
 The JSON files are the source of truth. The report is rendered from them and
@@ -230,7 +231,7 @@ rest of the previous workspace, including any older `prior/`.
      "status": "undetected", "tests": [], "evidence": [], "note": "…"}
   ],
   "by_category": {"state": {"total": 1, "asserted": 0, "weak": 0, "contradicted": 1,
-                            "uncovered": 0, "not_verifiable": 0}, "…": {}}
+                            "uncovered": 0, "not_verifiable": 0}}
 }
 ```
 
@@ -257,13 +258,17 @@ rest of the previous workspace, including any older `prior/`.
     **[gate]**.
   - `uncovered`, `not_verifiable`: `reason` *(text)* **[gate]**.
 - `cells_tested`: cells of a matrix in `checks.json` that are `defined` or
-  `guarded`, never a `hole`, each with at least one test **[gate]**.
+  `guarded`, never a `hole`, each with at least one test **[gate]**. A
+  `guarded` cell counts only when the test expects the refusal. A test that
+  drives a hole is recorded in `tests[].operators`; holes are not tested
+  cells.
 - `finding_gaps`: every confirmed finding exactly once, `detected`,
   `undetected` or `enshrined`; `detected` and `enshrined` need tests and a
-  quoted citation **[gate]**.
+  quoted citation **[gate]**. A finding named by a `contradicted` coverage
+  entry is `enshrined` **[gate]**.
 - `by_category` has the eight categories and equals the count the validator
   recomputes from `invariants` and `coverage` **[gate]**. Never write it by
-  hand; copy what the validator reports.
+  hand: write `{}`, run G5 and copy the JSON it prints.
 
 ## `reaudit.json` — F6
 
@@ -311,7 +316,8 @@ The validator reads the rendered Markdown and checks it against the records:
   starts with `findings`, `clean` or `not verifiable`, matching
   `checks.json` **[gate]**.
 - `functional`: no mermaid block, no `**Check**` lines, no twelve-check
-  table **[gate]**.
+  table, and no internal ids such as `I-3`, `X-4`, `C-2`, `M-1`, `O-5` or
+  `T-1` **[gate]**.
 - Both modes: an invariant coverage table with one row per category,
   `| state | total | asserted | weak | contradicted | uncovered | not verifiable |`,
   whose numbers equal `tests.json.by_category` **[gate]**. Category names and

@@ -203,8 +203,17 @@ def need_text(obj, key, where, errors, gate):
 
 def need_log(ctx, gate, errors):
     name = "work.md" if ctx.profile == "quick" else LOG_NAMES.get(gate)
-    if name and not (ctx.run_dir / name).is_file():
+    path = ctx.run_dir / name if name else None
+    if path is None:
+        return
+    if not path.is_file():
         errors.append(f"{gate} {name}: the phase log is missing")
+        return
+    if name == "work.md":
+        phase = "F" + gate[1:]
+        text = path.read_text(encoding="utf-8")
+        if not re.search(rf"^#+\s*{phase}\b", text, re.M):
+            errors.append(f"{gate} work.md: needs a '## {phase} …' section for that phase")
 
 
 # ---------------------------------------------------------------- gates
@@ -734,7 +743,7 @@ def g5(ctx):
                 e.append(f"G5 {where}.tests: unknown test {ref}")
         return [tests[r] for r in refs if r in tests]
 
-    seen = set()
+    seen, enshrining = set(), {}
     for i, entry in enumerate(data.get("coverage") or []):
         where = f"tests.json.coverage[{i}]"
         if not isinstance(entry, dict):
@@ -770,6 +779,8 @@ def g5(ctx):
             finding = entry.get("finding")
             if finding is not None and finding not in fingerprints:
                 e.append(f"G5 {where}.finding: {finding!r} is not a confirmed fingerprint")
+            elif finding is not None:
+                enshrining[finding] = where
             if finding is None:
                 need_text(entry, "reason", where, e, "G5")
         if level in {"uncovered", "not_verifiable"}:
@@ -793,6 +804,7 @@ def g5(ctx):
         known_tests(entry.get("tests"), where)
 
     gapped = set()
+    gap_status = {}
     for i, gap in enumerate(data.get("finding_gaps") or []):
         where = f"tests.json.finding_gaps[{i}]"
         fp = gap.get("finding") if isinstance(gap, dict) else None
@@ -802,6 +814,7 @@ def g5(ctx):
         if fp in gapped:
             e.append(f"G5 {where}.finding: {fp} is classified twice")
         gapped.add(fp)
+        gap_status[fp] = gap.get("status")
         if gap.get("status") not in GAP_STATUS:
             e.append(f"G5 {where}.status: must be detected, undetected or enshrined")
         elif gap["status"] in {"detected", "enshrined"}:
@@ -812,10 +825,14 @@ def g5(ctx):
     for fp in sorted(f for f in fingerprints if isinstance(f, str)):
         if fp not in gapped:
             e.append(f"G5 tests.json.finding_gaps: confirmed {fp} is not classified")
+    for fp, where in sorted(enshrining.items()):
+        if fp in gap_status and gap_status[fp] != "enshrined":
+            e.append(f"G5 {where}.finding: a test contradicts an invariant through {fp}, "
+                     f"so finding_gaps must mark it enshrined, not {gap_status[fp]}")
 
     expected = coverage_counts(ctx)
     if data.get("by_category") != expected:
-        e.append(f"G5 tests.json.by_category: must be {expected}")
+        e.append(f"G5 tests.json.by_category: must be {json.dumps(expected, sort_keys=False)}")
     need_log(ctx, "G5", e)
     return e
 
@@ -975,6 +992,9 @@ def g7(ctx):
             e.append("G7 report: functional mode must not include mermaid diagrams")
         if re.search(r"^\s*[-*]\s*\*\*Check\*\*", text, re.M):
             e.append("G7 report: functional mode must not include check numbers")
+        ids_shown = sorted(set(re.findall(r"\b[IXCMOT]-\d+\b", prose)))
+        if ids_shown:
+            e.append(f"G7 report: functional mode must not show internal ids ({', '.join(ids_shown[:5])})")
         if len({int(n) for n, _ in rows if 1 <= int(n) <= 12}) == 12:
             e.append("G7 report: functional mode must not include the twelve-check coverage table")
     return e

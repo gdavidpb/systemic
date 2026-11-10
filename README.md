@@ -435,7 +435,8 @@ references/
 scripts/
   systemic_check.py           the gate validator (Python 3.9+, standard library)
 evals/
-  evals.json                  16 forward evals with assertions
+  evals.json                  20 forward evals with assertions
+  COVERAGE.md                 which eval and test covers each behavior of the skill
   test_systemic_check.py      validator tests: one contract violation per test
   test_adversarial_fixtures.py executable counterexamples for the fixtures
   fixtures/orders/            a code module with seeded defects and a green suite that misses them
@@ -444,6 +445,9 @@ evals/
   fixtures/clean-ticket/      a correct lifecycle with a strong suite: the false-positive control
   fixtures/guarded-elsewhere/ defended paths plus refund/recovery defects
   fixtures/independent-ledgers/ separate causes and bounded impact
+  fixtures/stock-reservations/ an implicit machine, concurrency, a justified critical, tests with traps
+  fixtures/monorepo/          an unfocused repository with a graphify map: scope proposal
+  fixtures/collision/         an unrelated file at the default report path
   fixtures/rerun/             a previous Markdown-only report (legacy re-audit)
   fixtures/rerun-external/    a missing successor: unverified re-audit
   fixtures/rerun-json/        a previous run with findings.json (fingerprint re-audit)
@@ -471,10 +475,14 @@ itself tested.
 the report and workspace against written assertions. To run one: copy the
 skill to an isolated location, substitute its absolute path for `<SKILL_DIR>`
 in the prompt, run the prompt from an empty working directory, and check each
-assertion. Evals 8, 9, 13 and 14 need a previous report seeded first; the
+assertion. Evals 8, 9, 13, 14 and 20 need a file seeded first; the
 setup is described in the `notes` field of `evals.json`. Cases 1–10 and 14
 request `full`; 11–13 exercise mode selection and history across modes; 15
-and 16 exercise the test audit.
+and 16 exercise the test audit; 17–20 cover concurrency, system limits,
+a justified critical, scope proposals, graphify, name collisions, the
+standard profile and excluded tests. [`evals/COVERAGE.md`](evals/COVERAGE.md)
+maps every behavior of the skill to the evals and tests that cover it, and
+names the few that no case covers yet.
 
 Evals 6 and 7 matter most as the skill changes. A tool that reports problems
 is only as useful as its false-positive rate, and every other eval pushes

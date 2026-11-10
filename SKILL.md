@@ -160,7 +160,9 @@ Fix what is analyzed, how, and where it is delivered, before reading code.
      `*.spec.*`, plus the test directories the build configuration declares.
      Add the ones that exercise the scope to `targets`. If none exist, say in
      `00-scope.md` where you looked; F5 then records the suite as absent.
-     If the user excludes the tests, F5 records them as out of scope.
+     A request that lists source files without naming the tests does not
+     exclude them: add the tests that exercise those files. Only an explicit
+     exclusion ("leave the tests out") makes F5 record them as out of scope.
   6. **Re-audit detection.** If a previous report covers the same scope (the
      same slug, or a title naming the same scope), archive it as the
      contracts file describes (`prior/report.md`, plus `prior/findings.json`
@@ -354,8 +356,10 @@ the invariant is violated. Running code is not asserting it.
      expects the refusal).
   6. **Findings against the suite.** Classify every confirmed finding as
      `detected`, `undetected` or `enshrined`.
-  7. **Counts.** Leave `by_category` to the validator: run G5, copy the
-     expected value it reports, run it again.
+  7. **Counts.** Leave `by_category` to the validator: write `{}`, run G5,
+     copy the JSON it reports as expected, run G5 again. That first, planned
+     failure is logged as `gate_failed` but does not count toward the two
+     corrections of the run protocol.
 - **Never run the suite.** The audit reads assertions. A green suite proves
   that its assertions hold, not that they assert the invariants.
 - **Outputs**: `tests.json`, `05-tests.md` (the reasoning per invariant).
@@ -366,7 +370,8 @@ the invariant is violated. Running code is not asserting it.
 
 ## F6 — Reconcile with the previous report (re-audit only)
 
-Skip this phase when `run.json.prior_report` is null.
+Skip this phase when `run.json.prior_report` is null, and log it in
+`run.json.log` as `{"phase": "F6", "event": "skipped"}`.
 
 - **Inputs**: `findings.json`; `prior/findings.json` (format `json`) or
   `prior/report.md` (format `md-legacy`).

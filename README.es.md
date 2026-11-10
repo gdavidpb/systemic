@@ -449,7 +449,8 @@ references/
 scripts/
   systemic_check.py           el validador de puertas (Python 3.9+, biblioteca estándar)
 evals/
-  evals.json                  16 evals de ejecución con aserciones
+  evals.json                  20 evals de ejecución con aserciones
+  COVERAGE.md                 qué eval y qué test cubre cada comportamiento de la skill
   test_systemic_check.py      tests del validador: una violación de contrato por test
   test_adversarial_fixtures.py contraejemplos ejecutables de los fixtures
   fixtures/orders/            un módulo de código con defectos sembrados y una suite en verde que no los ve
@@ -458,6 +459,9 @@ evals/
   fixtures/clean-ticket/      un ciclo de vida correcto con una suite sólida: el control de falsos positivos
   fixtures/guarded-elsewhere/ caminos defendidos más defectos de reembolso y recuperación
   fixtures/independent-ledgers/ causas independientes e impacto acotado
+  fixtures/stock-reservations/ máquina implícita, concurrencia, un crítico justificado, pruebas con trampas
+  fixtures/monorepo/          un repositorio sin foco con mapa de graphify: propuesta de alcance
+  fixtures/collision/         un archivo ajeno en la ruta por defecto del reporte
   fixtures/rerun/             un reporte previo solo en Markdown (re-auditoría legacy)
   fixtures/rerun-external/    un sucesor ausente: re-auditoría no verificada
   fixtures/rerun-json/        una ejecución previa con findings.json (re-auditoría por huella)
@@ -486,11 +490,15 @@ probada.
 fixture y califican el reporte y el espacio de trabajo contra aserciones
 escritas. Para correr una: copia la skill a una ubicación aislada, sustituye
 `<SKILL_DIR>` en el prompt por su ruta absoluta, ejecuta el prompt desde un
-directorio de trabajo vacío y revisa cada aserción. Las evals 8, 9, 13 y 14
-necesitan sembrar antes un reporte previo; la preparación está en el campo
+directorio de trabajo vacío y revisa cada aserción. Las evals 8, 9, 13, 14 y
+20 necesitan sembrar antes un archivo; la preparación está en el campo
 `notes` de `evals.json`. Los casos 1–10 y 14 piden `full`; los 11–13
 ejercitan la selección de modo y el historial entre modos; los 15 y 16, la
-auditoría de pruebas.
+auditoría de pruebas; los 17–20 cubren concurrencia, límites del sistema, un
+crítico justificado, propuestas de alcance, graphify, colisiones de nombre,
+el perfil standard y pruebas excluidas. [`evals/COVERAGE.md`](evals/COVERAGE.md)
+mapea cada comportamiento de la skill a las evals y pruebas que lo cubren, y
+nombra los pocos que ningún caso cubre todavía.
 
 Las evals 6 y 7 son las que más importan a medida que la skill cambia. Una
 herramienta que reporta problemas vale lo que vale su tasa de falsos

@@ -120,6 +120,20 @@ class G0Scope(GateTestCase):
         self.ws.edit("run.json", lambda d: d.update(profile="standard"))
         self.assertFails("G0", "00-scope.md")
 
+    def test_needs_scope_requires_a_proposal(self):
+        self.ws.edit("run.json", lambda d: d.update(status="needs_scope", phase="F0", scope_proposal="tbd"))
+        self.assertFails("G0", "scope_proposal")
+
+    def test_needs_scope_pause_is_valid_before_any_phase_output(self):
+        self.ws.edit("run.json", lambda d: d.update(
+            status="needs_scope", phase="F0",
+            scope_proposal="Narrow to the order lifecycle in operations.py, the only module with state"))
+        for name in ("sources.json", "model.json", "checks.json", "findings.json", "tests.json"):
+            (self.ws.run_dir / name).unlink()
+        self.ws.report.unlink()
+        code, out = self.ws.check("all")
+        self.assertEqual(code, 0, out)
+
 
 class G1Sources(GateTestCase):
     def test_hash_must_match_the_file_read(self):
@@ -228,6 +242,17 @@ class G5Tests(GateTestCase):
                           "reason": None}
         self.ws.edit("tests.json", absent)
         self.assertFails("G5", "with no test suite every invariant is uncovered")
+
+    def test_contradicted_finding_must_be_enshrined(self):
+        def demote(d):
+            d["finding_gaps"][0].update(status="undetected", tests=[], evidence=[])
+        self.ws.edit("tests.json", demote)
+        self.assertFails("G5", "must mark it enshrined")
+
+    def test_quick_log_needs_a_section_per_phase(self):
+        log = self.ws.run_dir / "work.md"
+        log.write_text(log.read_text().replace("## F5 Test audit", "## Tests"))
+        self.assertFails("G5", "needs a '## F5")
 
     def test_test_ids_are_unique(self):
         self.ws.edit("tests.json", lambda d: d["tests"][1].update(id="X-1"))
@@ -408,6 +433,11 @@ class G7Report(GateTestCase):
         code, out = self.ws.check("G7")
         self.assertNotIn("invariant coverage", out)
         self.assertNotIn("cells tested", out)
+
+    def test_functional_mode_hides_internal_ids(self):
+        self.ws.edit("run.json", lambda d: d.update(mode="functional", mode_source="default"))
+        code, out = self.ws.check("G7")
+        self.assertIn("must not show internal ids", out)
 
     def test_no_html(self):
         self.ws.report.write_text(self.ws.report.read_text() + "\n<div>summary</div>\n")

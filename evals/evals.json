@@ -1,6 +1,6 @@
 {
   "skill_name": "systemic",
-  "notes": "Evals 1, 2, 4, 5, 6, 7, 9 and 10 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1; 5 targets partial failure and loops; 6 is the clean false-positive control; 7 distinguishes actual defenses from independent refund and failed-payment recovery defects; 9 tests an unverified re-audit antecedent; 10 tests independent root causes, historical snapshots and impact-based severity). Evals 8 and 9 need setup: copy their previous-orders-module.md to <working-dir>/systemic-out/orders-module.md BEFORE the run. Substitute the absolute skill path for <SKILL_DIR>. Eval 3 is a template requiring a real target supplied at runtime. Reports go under systemic-out/ in the working directory, outside the fixture directories. Isolate runs to prevent stale reports; for re-audits seed the correct previous report. No expected finding count forbids additional evidence-backed defects. Assertions evaluate causal evidence and impact, not agreement with a preferred phrasing. Output selection is tested separately: cases 1-10 explicitly request full to preserve their detailed-format assertions; 11 uses no mode and must default to functional; 12 explicitly requests full on the same invoice fixture; 13 reauds an older full report in default functional mode. Case 13 requires the same previous-report setup as 9. Both modes keep evidence, labels, confidence, impact limits and finding history; only presentation differs. Since the gated process, every run also writes its workspace at systemic-out/<slug>/ (run.json, sources.json, model.json, checks.json, findings.json, reaudit.json on re-audits, plus phase logs or work.md); the report path is unchanged. Every case therefore carries a workspace assertion graded with scripts/systemic_check.py all <workspace>. Eval 14 needs setup: copy evals/fixtures/rerun-json/orders-module.md to <working-dir>/systemic-out/orders-module.md and evals/fixtures/rerun-json/orders-module/ to <working-dir>/systemic-out/orders-module/ BEFORE the run. The validator itself is tested deterministically by evals/test_systemic_check.py against the golden workspace in evals/fixtures/runs/orders-valid. Evals 15 and 16 exercise the test-audit phase (F5): 15 on the orders fixture, whose green suite enshrines the refund closure defect and misses the others; 16 on the clean ticket module, whose strong suite must be credited without manufactured gaps. Every workspace now also holds tests.json; a scope with no tests records the suite as absent, so every invariant is uncovered and every finding undetected.",
+  "notes": "Evals 1, 2, 4, 5, 6, 7, 9 and 10 are self-contained: their fixtures live in evals/fixtures/ inside this skill (4 reuses 1; 5 targets partial failure and loops; 6 is the clean false-positive control; 7 distinguishes actual defenses from independent refund and failed-payment recovery defects; 9 tests an unverified re-audit antecedent; 10 tests independent root causes, historical snapshots and impact-based severity). Evals 8 and 9 need setup: copy their previous-orders-module.md to <working-dir>/systemic-out/orders-module.md BEFORE the run. Substitute the absolute skill path for <SKILL_DIR>. Eval 3 is a template requiring a real target supplied at runtime. Reports go under systemic-out/ in the working directory, outside the fixture directories. Isolate runs to prevent stale reports; for re-audits seed the correct previous report. No expected finding count forbids additional evidence-backed defects. Assertions evaluate causal evidence and impact, not agreement with a preferred phrasing. Output selection is tested separately: cases 1-10 explicitly request full to preserve their detailed-format assertions; 11 uses no mode and must default to functional; 12 explicitly requests full on the same invoice fixture; 13 reauds an older full report in default functional mode. Case 13 requires the same previous-report setup as 9. Both modes keep evidence, labels, confidence, impact limits and finding history; only presentation differs. Since the gated process, every run also writes its workspace at systemic-out/<slug>/ (run.json, sources.json, model.json, checks.json, findings.json, reaudit.json on re-audits, plus phase logs or work.md); the report path is unchanged. Every case therefore carries a workspace assertion graded with scripts/systemic_check.py all <workspace>. Eval 14 needs setup: copy evals/fixtures/rerun-json/orders-module.md to <working-dir>/systemic-out/orders-module.md and evals/fixtures/rerun-json/orders-module/ to <working-dir>/systemic-out/orders-module/ BEFORE the run. The validator itself is tested deterministically by evals/test_systemic_check.py against the golden workspace in evals/fixtures/runs/orders-valid. Evals 15 and 16 exercise the test-audit phase (F5): 15 on the orders fixture, whose green suite enshrines the refund closure defect and misses the others; 16 on the clean ticket module, whose strong suite must be credited without manufactured gaps. Every workspace now also holds tests.json; a scope with no tests records the suite as absent, so every invariant is uncovered and every finding undetected. Evals 17-20 close the remaining coverage gaps: 17 (stock-reservations) has an implicit machine, positive concurrency and system-limit findings, a justified critical and a suite with traps plus a red test that detects a defect; 18 (monorepo) must stop at needs_scope and use graphify to propose the stateful subsystem; 19 runs focused on billing/ with graphify in full mode and an absent suite; 20 needs setup — copy evals/fixtures/collision/orders-module.md to <working-dir>/systemic-out/orders-module.md BEFORE the run — and covers a name collision, the explicit standard profile and explicitly excluded tests. evals/COVERAGE.md maps every behavior the skill verifies to the evals and deterministic tests that cover it.",
   "evals": [
     {
       "id": 1,
@@ -142,7 +142,8 @@
         "Findings cite file:line evidence",
         "The report is written to a local Markdown file under systemic-out/ and the chat reply states its path",
         "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
-        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses.",
+        "No test files exist in the fixture: tests.json records the suite as absent, says where tests were looked for, marks every invariant uncovered and every finding undetected, and the report says the saga has no tests rather than inventing coverage."
       ],
       "output_mode": "full"
     },
@@ -278,7 +279,8 @@
         "Does not invent retry, concurrency or persistence failures unsupported by the supplied implementation.",
         "Provides the full check-coverage table, source evidence and the local report path.",
         "Uses full output because the current request explicitly selects it; mode selection does not weaken evidence, refutation, severity or source verification.",
-        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses.",
+        "No test files exist in the fixture: tests.json records the suite as absent with what was searched; every invariant is uncovered and the report's invariant coverage table shows them in the uncovered column."
       ],
       "output_mode": "full"
     },
@@ -402,7 +404,8 @@
         "The functional report explains the gaps in everyday language (for example, that no test would notice a redelivered payment counted twice) without invariant ids, technique names or matrix cells",
         "Uses functional output because no mode was requested.",
         "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses.",
-        "tests.json records test_orders.py as an in-scope suite, one coverage entry per catalogued invariant, and a finding_gaps entry for every confirmed finding."
+        "tests.json records test_orders.py as an in-scope suite, one coverage entry per catalogued invariant, and a finding_gaps entry for every confirmed finding.",
+        "Tests that only rely on the unguarded mark_paid in their setup (test_ship_then_deliver, test_refund_moves_the_order_to_refund_pending) are not taken as enshrining the missing-guard finding unless they assert it; a finding named by a contradicted invariant is marked enshrined."
       ],
       "output_mode": "functional"
     },
@@ -420,15 +423,123 @@
       "assertions": [
         "PRIMARY: reports ZERO critical and ZERO high findings, and no finding is classified as enshrined",
         "Credits the transition invariants as asserted by test_every_state_and_action_is_a_transition_or_a_refusal, which drives every (state, action) cell and expects refusals to change nothing",
-        "Credits the assignee and resolved_at field rules as asserted by test_every_action_sequence_keeps_the_field_rules, a sequence test over every action sequence up to length five",
+        "Credits the open-has-no-assignee rule as asserted by test_every_action_sequence_keeps_the_field_rules, which walks every action sequence up to length five. Rules the same test checks only in part (resolved_at cleared only by reopen; the assignee kept after resolve) are weak, and the reason names the violation that would pass, such as unassign setting resolved_at.",
         "Credits closed as a never-left final state (temporal) through test_closed_is_absorbing, and the repeated-operation rule (repetition) through test_applying_an_operation_twice_is_safe",
         "Credits reopen undoing resolve as an asserted algebraic invariant via test_reopen_undoes_resolve",
         "States in full mode that every defined and guarded cell of the ticket matrix is tested, with the 'cells tested: N/M' line where N equals M",
-        "Does NOT invent concurrency or atomicity invariants for an in-memory module with no multi-system write; those categories are empty or not verifiable",
+        "Does NOT invent concurrency or atomicity invariants for an in-memory module with no second system to fail: field updates of one dataclass do not create an atomicity invariant, and both categories are empty",
         "Does not run the test suite; the report says the tests were read, not run",
         "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
       ],
       "output_mode": "full"
+    },
+    {
+      "id": 17,
+      "name": "concurrency-limits-and-test-traps",
+      "prompt": "Run a systemic analysis of the stock reservation service at <SKILL_DIR>/evals/fixtures/stock-reservations/ (README.md, models.py, operations.py, server.py, test_stock.py). It runs on a threaded server and we want to know whether the lifecycle and our tests hold up. Use output full.",
+      "expected_output": "A full report on an implicit state machine (no status column) with a positive concurrency finding, a justified critical, a system-limit finding and a test suite full of traps. The suite has one red test that detects a real defect, a snapshot and a mock assertion that look like coverage and are not, a 'concurrency' test with no interleaving, and genuine property, fault-injection and metamorphic tests that must be credited.",
+      "files": [
+        "evals/fixtures/stock-reservations/README.md",
+        "evals/fixtures/stock-reservations/models.py",
+        "evals/fixtures/stock-reservations/operations.py",
+        "evals/fixtures/stock-reservations/server.py",
+        "evals/fixtures/stock-reservations/test_stock.py"
+      ],
+      "assertions": [
+        "Models the unit lifecycle as an IMPLICIT machine (kind implicit) over reserved_by, reserved_until and sold_at, with the states available, reserved and sold derived from the README table.",
+        "Detects the lost update (check 8, positive): reserve() reads the row, checks it and writes the whole row with no lock, version or atomic claim, and server.py runs requests for the same unit on pool threads; two shoppers can both be told they hold the unit, contradicting rule 1 — rated high, as a RISK with the interleaving written as its condition.",
+        "Detects the critical defect and justifies the rating: sweep() deletes every row whose reserved_until has passed, including sold units, and rule 4 says the units table is the only record of a sale and fulfilment reads it hours later. Every sale is permanently lost 15 minutes after it happens; impact.scope and impact.unrecoverable_because are filled.",
+        "Detects that sell() writes sold_at before payments.charge(), so a declined payment leaves the unit sold and unpaid, contradicting rule 3 (check 6).",
+        "Detects that reserve() does not consider sold_at: once the window of a sold unit lapses, another shopper can reserve it and reserved_by changes on a sold unit, contradicting the README (a sold unit never changes hands).",
+        "Detects the system limit (check 11, positive): bundles are not representable, so price_of() special-cases the BUNDLE- prefix and splits the price evenly, while rule 5 says bundles are already requested — stated as what the system cannot represent and which component is missing; medium or high.",
+        "Test audit: credits the 15-minute window as asserted by test_hold_lasts_exactly_the_reservation_window (a loop over the domain, technique property) and 'release undoes reserve' as an asserted algebraic invariant via test_release_undoes_reserve (technique metamorphic).",
+        "Test audit: credits the charge-ordering invariant as asserted by the fault-injection test test_declined_payment_keeps_the_unit_reserved, and classifies the sell-before-charge finding as DETECTED, noting that this test fails today. Does not run the suite to learn this.",
+        "Test audit: test_sweep_after_the_window compares against the recorded snapshot EXPECTED_AFTER_SWEEP = [], which asserts that the sold unit is deleted: the 'a sold unit is never deleted' invariant is contradicted and the sweep finding is ENSHRINED.",
+        "Test audit: test_concurrent_reservations_hold_one_shopper waits for the first request before submitting the second, so it is a sequence with no interleaving; the concurrency invariant is weak, not asserted, and the lost-update finding is undetected.",
+        "Test audit: test_sell_charges_the_shopper only asserts on the mock (assert_called_once_with) and test_bundle_without_parts_is_rejected catches any Exception; neither is credited as asserting a state or pricing invariant.",
+        "The full report has the invariant coverage table with every category, the 'M-1 cells tested: N/M' line, the per-invariant table and the findings-against-the-suite table; coverage gaps add no finding headings.",
+        "Every finding carries an honesty label, a severity and file:line evidence, and the twelve-row coverage table gives checks 8 and 11 the verdict findings.",
+        "Uses full output because the current request explicitly selects it.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses.",
+        "model.json has the implicit machine with its fields, tests.json records test_stock.py in scope, and finding_gaps contains at least one detected, one enshrined and one undetected entry."
+      ],
+      "output_mode": "full"
+    },
+    {
+      "id": 18,
+      "name": "unfocused-repo-needs-scope",
+      "prompt": "Run a systemic analysis of our storefront monorepo at <SKILL_DIR>/evals/fixtures/monorepo/. I have no idea where the problems are, just check everything.",
+      "expected_output": "The skill does not analyze the whole repository. It reads graphify-out/graph.json before searching, sees that billing/ is the only subsystem with state (status, trial_ends, paid_through, failed_charges), proposes narrowing to the subscription lifecycle and stops to ask. No report is written yet.",
+      "files": [
+        "evals/fixtures/monorepo/README.md",
+        "evals/fixtures/monorepo/graphify-out/graph.json",
+        "evals/fixtures/monorepo/billing/subscriptions.py",
+        "evals/fixtures/monorepo/billing/dunning.py",
+        "evals/fixtures/monorepo/catalog/products.py",
+        "evals/fixtures/monorepo/catalog/prices.py",
+        "evals/fixtures/monorepo/notifications/email.py",
+        "evals/fixtures/monorepo/search/query.py",
+        "evals/fixtures/monorepo/search/rank.py",
+        "evals/fixtures/monorepo/shared/text.py",
+        "evals/fixtures/monorepo/docs/architecture.md"
+      ],
+      "assertions": [
+        "PRIMARY: stops in F0 with run.json status needs_scope and asks the user to confirm a narrower scope, instead of running the analysis over the whole repository.",
+        "The scope_proposal names the billing subscription lifecycle (billing/subscriptions.py and billing/dunning.py) as the subsystem with the most state, and explains why the other services are poor targets (stateless transformations).",
+        "Reads graphify-out/graph.json before searching, and 00-scope.md (or work.md) says the graph informed the proposal, citing what it showed (state fields, the dunning -> subscriptions edge).",
+        "Does not write a findings report, does not start F1 and does not create sources.json, model.json or later files.",
+        "The chat reply is the question with the proposal, not a summary of findings.",
+        "`python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0 on the paused run (G0 accepts needs_scope with a substantive scope_proposal)."
+      ],
+      "output_mode": "functional"
+    },
+    {
+      "id": 19,
+      "name": "graphify-focused-no-tests",
+      "prompt": "Run a systemic analysis of the subscription lifecycle in the monorepo at <SKILL_DIR>/evals/fixtures/monorepo/ — billing/ only. Use output full.",
+      "expected_output": "A focused full run over billing/. graphify-out/graph.json is read first and the full report says it informed the scope; findings still cite the billing sources directly. The module has no tests, so the test audit records the suite as absent: every invariant uncovered and every finding undetected, without inventing coverage.",
+      "files": [
+        "evals/fixtures/monorepo/graphify-out/graph.json",
+        "evals/fixtures/monorepo/billing/subscriptions.py",
+        "evals/fixtures/monorepo/billing/dunning.py",
+        "evals/fixtures/monorepo/docs/architecture.md"
+      ],
+      "assertions": [
+        "States in the full report's scope statement that graphify-out/graph.json informed which modules were opened; every finding cites billing sources read directly, never the graph.",
+        "Detects that charge_failed() and cancel() write status with no guard: a failed renewal moves a canceled subscription back to past_due, reviving a terminal state (checks 3/4) — rated high.",
+        "Detects that activate() can move a canceled subscription back to active with no guard and that nothing ever reads trial_ends: trial expiry is declared by the field but no operator ends a trial (reachability or system limit).",
+        "Detects that failed_charges is never reset by activate(): after a successful renewal the counter keeps old failures, so a later single failure can cancel a subscription that had recovered (check 6 or 10).",
+        "tests.json records the suite as absent with where tests were searched (billing/, test_*.py, tests/), every invariant uncovered and every finding undetected; the report's coverage table shows all invariants in the uncovered column.",
+        "Does not analyze catalog/, notifications/, search/ or shared/ beyond what the graph and scope decision required.",
+        "Uses full output because the current request explicitly selects it.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
+      ],
+      "output_mode": "full"
+    },
+    {
+      "id": 20,
+      "name": "name-collision-standard-profile-tests-excluded",
+      "prompt": "Run a systemic analysis of the orders module at <SKILL_DIR>/evals/fixtures/orders/ using the standard profile. Leave the tests out of it; I only want the code reviewed this time.",
+      "expected_output": "Setup seeds an unrelated file at <working-dir>/systemic-out/orders-module.md (team notes, not a systemic report). The skill recognizes the name collision, keeps that file untouched, picks another slug and writes alongside, saying so in chat. It runs the standard profile with one log per phase. The tests are explicitly excluded, so the test audit records the suite as out of scope and every invariant as not verifiable.",
+      "files": [
+        "evals/fixtures/orders/README.md",
+        "evals/fixtures/orders/models.py",
+        "evals/fixtures/orders/operations.py",
+        "evals/fixtures/orders/webhook.py",
+        "evals/fixtures/orders/test_orders.py",
+        "evals/fixtures/collision/orders-module.md"
+      ],
+      "assertions": [
+        "PRIMARY: does not overwrite or archive the seeded systemic-out/orders-module.md: it is not a systemic report, so prior_report stays null, the file is byte-for-byte unchanged, and the run uses a different slug (for example orders-lifecycle) whose report sits alongside.",
+        "The chat reply says that a file with the default name already existed, was not a systemic report and was left untouched, and gives the new report path.",
+        "Uses the standard profile because it was requested (profile_source explicit): the workspace holds 00-scope.md, 01-sources.md, 02-model.md, 03-checks.md, 04-audit.md and 05-tests.md rather than a single work.md.",
+        "Excludes test_orders.py because the user asked: it is recorded in sources.json excluded with that reason (or simply not read), tests.json records the suite as out_of_scope with the reason, and every invariant is not_verifiable.",
+        "The report's invariant coverage table puts every invariant in the not verifiable column and says the tests were excluded at the user's request, without claiming the module is untested.",
+        "Finds the same code defects as eval 1 (at minimum the refund closure, the missing cancel guard and the webhook idempotency flaw); excluding the tests does not reduce the code audit.",
+        "Uses functional output because no mode was requested.",
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
+      ],
+      "output_mode": "functional"
     }
   ]
 }

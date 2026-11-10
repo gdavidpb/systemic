@@ -561,8 +561,9 @@ test: twenty realistic requests, half of which should make the skill
 trigger and half of which should not (a code review, a failing test, line
 coverage, writing a new state machine). They test the `description` in
 `SKILL.md`, which is all Claude sees when it decides whether to use the
-skill. Run them with the description optimizer of Anthropic's
-`skill-creator` skill after changing the description.
+skill. Run them with the trigger evaluation of Anthropic's `skill-creator`
+skill after changing the description, one worker per project directory
+(why, and the last result, are in [`evals/BASELINE.md`](evals/BASELINE.md)).
 
 Evals 6 and 7 matter most as the skill changes. A tool that reports problems
 is only as useful as its false-positive rate, and every other eval pushes

@@ -580,8 +580,10 @@ prueba. Veinte peticiones realistas, de las que la mitad debe activar la
 skill y la otra mitad no (una revisión de código, un test que falla,
 cobertura de líneas, escribir una máquina de estados nueva). Prueban la
 `description` de `SKILL.md`, que es todo lo que Claude ve cuando decide si
-usar la skill. Ejecútalas con el optimizador de descripciones de la skill
-`skill-creator` de Anthropic después de cambiar la descripción.
+usar la skill. Ejecútalas con la evaluación de activación de la skill
+`skill-creator` de Anthropic después de cambiar la descripción, con un solo
+proceso por directorio de proyecto (el porqué y el último resultado están
+en [`evals/BASELINE.md`](evals/BASELINE.md)).
 
 Las evals 6 y 7 son las que más importan a medida que la skill cambia. Una
 herramienta que reporta problemas vale lo que vale su tasa de falsos

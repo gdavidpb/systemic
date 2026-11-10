@@ -107,6 +107,40 @@ running the code and the tests.
 |---|---|---|---|
 | 26 `stock-reservations`, execution allowed | 11 / 11 assertions; `systemic_check.py all` passes; no gate failed. `execution: allowed` with an explicit source; nine finding traces, the suite and thirteen mutated copies executed; scripts kept under `traces/`; every fixture file byte for byte unchanged, no cache left behind. The snapshot, mock and fake-concurrency tests are green and still not credited | 227k | 16.7 min |
 
+## Trigger evals
+
+`trigger-evals.json` against the description in `SKILL.md`, measured with the
+trigger evaluation of Anthropic's `skill-creator` (`scripts/run_eval.py`,
+which registers the description as a skill in an empty project and watches
+whether a headless `claude -p` invokes it first). Three runs per query.
+
+| Queries | Expected | Result |
+|---|---|---|
+| 10 that should trigger | invoked | 10 / 10, each 3 of 3 runs |
+| 10 that should not | not invoked | 10 / 10, each 0 of 3 runs |
+
+The description was left as it is: there was nothing to optimize.
+
+**A measurement trap.** The first attempt scored 10 / 20, with every
+should-trigger query failing. The description was not at fault. With
+`--num-workers` above 1, each worker registers its own copy of the skill
+under a different name in the same project; the model sees several
+identical skills, invokes any one of them, and each worker counts only its
+own copy. Run it with `--num-workers 1`, and for parallelism use separate
+project directories:
+
+```sh
+mkdir -p /tmp/trigger-1/.claude && cd /tmp/trigger-1
+PYTHONPATH=<skill-creator> python3 -m scripts.run_eval \
+  --eval-set <skill>/evals/trigger-evals.json --skill-path <skill> \
+  --runs-per-query 1 --num-workers 1 --timeout 90 --verbose
+```
+
+What this does not measure: the queries name files that do not exist in the
+empty project, so only the decision to invoke the skill is tested, not what
+it does next; and the other skills installed on the machine compete for the
+same requests, so the result depends on that set.
+
 ## How to reproduce
 
 1. Copy `SKILL.md`, `references/`, `scripts/` and only the case's fixture to

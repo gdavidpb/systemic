@@ -120,7 +120,7 @@ are listed apart at the end and do not close a gap in the tables below.
 | Hashes and line counts from the validator (`hash`) | all | `HashHelper` |
 | Contracts document what the validator enforces | — | `Documentation` |
 | `SKILL.md` within the skill format (description ≤ 1024, body ≤ 500 lines, references exist) | — | `Documentation` |
-| The description triggers on the right requests | `trigger-evals.json` | `Documentation` (well-formed only) |
+| The description triggers on the right requests | `trigger-evals.json` (20 / 20, see `BASELINE.md`) | `Documentation` (well-formed only) |
 | No artifact, HTML or server | 1, 2, 3 | `G7Report` (no HTML) |
 
 Evals 21–23 induce the runs a prompt alone cannot: an interrupted run whose

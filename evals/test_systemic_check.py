@@ -260,6 +260,20 @@ class G5Tests(GateTestCase):
         log.write_text(log.read_text().replace("## F5 Test audit", "## Tests"))
         self.assertFails("G5", "needs a '## F5")
 
+    def test_excluded_suite_assesses_no_finding(self):
+        def exclude(d):
+            d["suite"] = {"status": "out_of_scope", "files": [], "searched": None,
+                          "reason": "The user asked to leave the tests out of this run"}
+            d["tests"], d["cells_tested"] = [], []
+            for entry in d["coverage"]:
+                entry.update(level="not_verifiable", tests=[], evidence=[], finding=None,
+                             reason="The tests were excluded at the user's request")
+        self.ws.edit("tests.json", exclude)
+        self.ws.edit("sources.json", lambda d: d.update(files=[f for f in d["files"] if f.get("role") != "test"]))
+        code, out = self.ws.check("G5")
+        self.assertIn("every finding is not_assessed", out)
+        self.assertNotIn("records test files as read", out)
+
     def test_test_ids_are_unique(self):
         self.ws.edit("tests.json", lambda d: d["tests"][1].update(id="X-1"))
         self.assertFails("G5", "must be a unique X-<n>")
@@ -439,6 +453,16 @@ class G7Report(GateTestCase):
         code, out = self.ws.check("G7")
         self.assertNotIn("invariant coverage", out)
         self.assertNotIn("cells tested", out)
+
+    def test_full_report_discloses_graphify(self):
+        self.ws.edit("run.json", lambda d: d.update(graph_informed=True))
+        self.assertFails("G7", "says graphify informed the scope")
+
+    def test_functional_report_does_not_mention_graphify(self):
+        self.ws.edit("run.json", lambda d: d.update(graph_informed=True, mode="functional", mode_source="default"))
+        self.ws.report.write_text(self.ws.report.read_text() + "\nScope chosen with graphify.\n")
+        code, out = self.ws.check("G7")
+        self.assertIn("does not mention graphify", out)
 
     def test_functional_mode_hides_internal_ids(self):
         self.ws.edit("run.json", lambda d: d.update(mode="functional", mode_source="default"))

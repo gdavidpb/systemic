@@ -54,7 +54,7 @@ TECHNIQUE_FIT = {
     "algebraic": {"metamorphic", "property"},
 }
 SUITE_STATUS = {"in_scope", "absent", "out_of_scope"}
-GAP_STATUS = {"detected", "undetected", "enshrined"}
+GAP_STATUS = {"detected", "undetected", "enshrined", "not_assessed"}
 FORBIDDEN_DIRS = {"node_modules", "vendor", ".git", "fixtures", "site-packages", ".venv", "venv"}
 FILLER = {"ok", "n/a", "na", "none", "-", "todo", "tbd", "yes", "no", "done", "checked", "fine", "verified"}
 MIN_TEXT = 12
@@ -244,6 +244,8 @@ def g0(ctx):
         e.append(f"G0 run.json.status: must be one of {sorted(STATUSES)}")
     if run.get("phase") not in PHASES:
         e.append(f"G0 run.json.phase: must be F0..{FINAL_PHASE}")
+    if run.get("graph_informed", False) not in {True, False}:
+        e.append("G0 run.json.graph_informed: must be true or false")
     if run.get("validation") not in {"script", "manual"}:
         e.append("G0 run.json.validation: must be script or manual")
     if not ctx.source_root.is_dir():
@@ -718,6 +720,8 @@ def g5(ctx):
             e.append("G5 tests.json.suite: status absent, but sources.json records test files")
     if status == "out_of_scope":
         need_text(suite, "reason", "tests.json.suite", e, "G5")
+        if test_files:
+            e.append("G5 tests.json.suite: status out_of_scope, but sources.json records test files as read")
 
     tests = {}
     for i, test in enumerate(data.get("tests") or []):
@@ -822,10 +826,14 @@ def g5(ctx):
         gapped.add(fp)
         gap_status[fp] = gap.get("status")
         if gap.get("status") not in GAP_STATUS:
-            e.append(f"G5 {where}.status: must be detected, undetected or enshrined")
+            e.append(f"G5 {where}.status: must be detected, undetected, enshrined or not_assessed")
         elif gap["status"] in {"detected", "enshrined"}:
             known_tests(gap.get("tests"), where)
             cite_in_tests(gap.get("evidence"), f"{where}.evidence")
+        if status == "out_of_scope" and gap.get("status") != "not_assessed":
+            e.append(f"G5 {where}.status: with the suite out of scope every finding is not_assessed")
+        if status != "out_of_scope" and gap.get("status") == "not_assessed":
+            e.append(f"G5 {where}.status: not_assessed applies only when the suite is out of scope")
         if status == "absent" and gap.get("status") != "undetected":
             e.append(f"G5 {where}.status: with no test suite every finding is undetected")
     for fp in sorted(f for f in fingerprints if isinstance(f, str)):
@@ -981,6 +989,12 @@ def g7(ctx):
         e.append("G7 report: contains HTML tags; the report is plain Markdown")
     rows = re.findall(r"^\|\s*(\d{1,2})\s*\|[^|\n]*\|\s*([^|\n]+?)\s*\|", text, re.M)
     mode = ctx.run.get("mode")
+    if ctx.run.get("graph_informed") is True:
+        mentions = re.search(r"graphify", prose, re.I)
+        if mode == "full" and not mentions:
+            e.append("G7 report: graph_informed is true, so the full report says graphify informed the scope")
+        if mode == "functional" and mentions:
+            e.append("G7 report: functional mode does not mention graphify")
     if mode == "full":
         checks = {c.get("id"): c.get("verdict") for c in (ctx.load("checks.json") or {}).get("checks") or []}
         table = {}

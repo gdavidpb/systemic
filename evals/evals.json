@@ -501,18 +501,18 @@
       "files": [
         "evals/fixtures/monorepo/graphify-out/graph.json",
         "evals/fixtures/monorepo/billing/subscriptions.py",
-        "evals/fixtures/monorepo/billing/dunning.py",
-        "evals/fixtures/monorepo/docs/architecture.md"
+        "evals/fixtures/monorepo/billing/dunning.py"
       ],
       "assertions": [
         "States in the full report's scope statement that graphify-out/graph.json informed which modules were opened; every finding cites billing sources read directly, never the graph.",
-        "Detects that charge_failed() and cancel() write status with no guard: a failed renewal moves a canceled subscription back to past_due, reviving a terminal state (checks 3/4) — rated high.",
+        "Detects that charge_failed() writes status with no guard: a failed renewal moves a canceled subscription back to past_due, leaving a terminal state (check 3) — rated high.",
         "Detects that activate() can move a canceled subscription back to active with no guard and that nothing ever reads trial_ends: trial expiry is declared by the field but no operator ends a trial (reachability or system limit).",
-        "Detects that failed_charges is never reset by activate(): after a successful renewal the counter keeps old failures, so a later single failure can cancel a subscription that had recovered (check 6 or 10).",
-        "tests.json records the suite as absent with where tests were searched (billing/, test_*.py, tests/), every invariant uncovered and every finding undetected; the report's coverage table shows all invariants in the uncovered column.",
+        "Detects that failed_charges is never reset by activate(): after a successful renewal the counter keeps old failures, so a later single failure can cancel a subscription that had recovered. Any check that explains it is acceptable (symmetry: an increment with no reset; or illegal representable state).",
+        "tests.json records the suite as absent with where tests were searched (at least billing/; a wider search of the repository is fine), every invariant uncovered and every finding undetected; the report's coverage table shows all invariants in the uncovered column.",
         "Does not analyze catalog/, notifications/, search/ or shared/ beyond what the graph and scope decision required.",
         "Uses full output because the current request explicitly selects it.",
-        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses."
+        "Leaves the run workspace systemic-out/<slug>/ beside the report, and `python3 <SKILL_DIR>/scripts/systemic_check.py all <workspace>` exits 0; or run.json has status incomplete with a stated reason that the report's first section discloses.",
+        "run.json records graph_informed: true."
       ],
       "output_mode": "full"
     },
@@ -530,10 +530,10 @@
         "evals/fixtures/collision/orders-module.md"
       ],
       "assertions": [
-        "PRIMARY: does not overwrite or archive the seeded systemic-out/orders-module.md: it is not a systemic report, so prior_report stays null, the file is byte-for-byte unchanged, and the run uses a different slug (for example orders-lifecycle) whose report sits alongside.",
+        "PRIMARY: does not overwrite or archive the seeded systemic-out/orders-module.md: it is not a systemic report, so prior_report stays null, the file is byte-for-byte unchanged, and the run uses the slug orders-module-systemic, whose report sits alongside.",
         "The chat reply says that a file with the default name already existed, was not a systemic report and was left untouched, and gives the new report path.",
         "Uses the standard profile because it was requested (profile_source explicit): the workspace holds 00-scope.md, 01-sources.md, 02-model.md, 03-checks.md, 04-audit.md and 05-tests.md rather than a single work.md.",
-        "Excludes test_orders.py because the user asked: it is recorded in sources.json excluded with that reason (or simply not read), tests.json records the suite as out_of_scope with the reason, and every invariant is not_verifiable.",
+        "Excludes test_orders.py because the user asked: it is recorded in sources.json excluded with that reason (or simply not read), tests.json records the suite as out_of_scope with the reason, every invariant is not_verifiable and every finding not_assessed; test_orders.py is never opened.",
         "The report's invariant coverage table puts every invariant in the not verifiable column and says the tests were excluded at the user's request, without claiming the module is untested.",
         "Finds the same code defects as eval 1 (at minimum the refund closure, the missing cancel guard and the webhook idempotency flaw); excluding the tests does not reduce the code audit.",
         "Uses functional output because no mode was requested.",

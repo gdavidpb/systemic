@@ -138,6 +138,9 @@ For every confirmed finding of F4, record what the suite does about it:
 - **detected** — a test asserts the correct behavior and fails today because
   of this defect.
 - **undetected** — no test would fail because of it. Say what is missing.
+- **not_assessed** — the user excluded the tests, so nothing is claimed
+  either way. Used for every finding when the suite is out of scope, and
+  never otherwise.
 - **enshrined** — a test **asserts** the defective behavior and passes because
   of it: fixing the defect turns the suite red. This is the most expensive
   kind of gap, because it tells whoever fixes the bug that they broke

@@ -252,7 +252,9 @@ it, leaves it **undetected**, or **enshrines** it — asserts the buggy
 behavior as correct. Enshrined findings come first: they are the ones where
 fixing the code breaks your build. These gaps are reported in their own
 section; they never add findings or change severities. If the scope has no
-tests, the report says so and every invariant reads as uncovered.
+tests, the report says so and every invariant reads as uncovered. If you ask
+it to leave the tests out, it does not open them, and the report says
+coverage was not assessed rather than claiming anything is untested.
 
 ## Output modes
 

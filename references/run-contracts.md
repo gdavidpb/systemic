@@ -51,11 +51,12 @@ Conventions:
 | `language`, `language_source` | e.g. `"es"`; `explicit`\|`conversation` |
 | `profile`, `profile_source` | `quick`\|`standard`; `explicit`\|`auto` |
 | `source_root` | directory the citations are relative to; absolute, or relative to the project root |
-| `targets` | files or directories under `source_root`, including the test files of the scope; each must exist **[gate]** |
+| `targets` | files or directories under `source_root`, including the test files of the scope unless the user excluded them (excluded tests go in `sources.json.excluded` with the user's reason, never in `targets`); each must exist **[gate]** |
 | `report_path`, `report_path_source` | relative to the project root, no `..`, never inside `node_modules`, `vendor`, `.git`, `fixtures`, a virtualenv **[gate]**; `default`\|`user` |
 | `prior_report` | `null`, or `{"path", "format": "json"\|"md-legacy"}`; see Re-audit below |
 | `source_ref` | `{"commit": <sha or null>, "dirty": <bool or null>}` |
 | `validation` | `script` when the validator ran; `manual` when it could not |
+| `graph_informed` | `true` when `graphify-out/graph.json` informed the scope; omitted or `false` otherwise |
 | `phase` | the phase in progress, `F0`…`F8` |
 | `status` | `in_progress`, `needs_scope`, `complete`, `incomplete` |
 | `scope_proposal` *(text)* | required when `status` is `needs_scope` **[gate]** |
@@ -241,7 +242,8 @@ rest of the previous workspace, including any older `prior/`.
   - `absent`: `searched` *(text)* says where tests were looked for; no file
     has `role: test`; every invariant is `uncovered` and every finding
     `undetected`.
-  - `out_of_scope`: `reason` *(text)*; every invariant is `not_verifiable`.
+  - `out_of_scope`: `reason` *(text)*; no file has `role: test`; every
+    invariant is `not_verifiable` and every finding `not_assessed`.
 - `tests`: unique `X-n`, a `name`, a `technique` among `example`,
   `sequence`, `property`, `stateful`, `repetition`, `concurrency`,
   `fault_injection`, `metamorphic`, modeled `operators`, and a quoted
@@ -263,7 +265,8 @@ rest of the previous workspace, including any older `prior/`.
   drives a hole is recorded in `tests[].operators`; holes are not tested
   cells.
 - `finding_gaps`: every confirmed finding exactly once, `detected`,
-  `undetected` or `enshrined`; `detected` and `enshrined` need tests and a
+  `undetected`, `enshrined`, or `not_assessed` (only, and always, when the
+  suite is `out_of_scope`); `detected` and `enshrined` need tests and a
   quoted citation **[gate]**. A finding named by a `contradicted` coverage
   entry is `enshrined` **[gate]**.
 - `by_category` has the eight categories and equals the count the validator
@@ -328,6 +331,8 @@ The validator reads the rendered Markdown and checks it against the records:
 - Coverage gaps never add a `### [severity] [LABEL]` heading and never change
   the count line.
 - No HTML tags outside code blocks **[gate]**.
+- When `graph_informed` is true, a `full` report says that graphify informed
+  the scope, and a `functional` report does not mention graphify **[gate]**.
 - When `status` is `incomplete`, the report must exist and its first section
   states the reason. The finding checks are skipped.
 

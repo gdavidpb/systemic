@@ -150,7 +150,9 @@ Fix what is analyzed, how, and where it is delivered, before reading code.
   2. If `graphify-out/graph.json` exists, read it BEFORE searching and use it
      to choose which modules to open: it maps files and their relations,
      which beats searching a large repo blind. It never replaces reading the
-     sources. Note in `00-scope.md` that it informed the scope; `full` says so
+     sources, and it is never cited as evidence. Set
+     `run.json.graph_informed: true` and note in the scope log (`00-scope.md`,
+     or the F0 section of `work.md`) what it showed; `full` says so
      in its report, `functional` does not mention it. If it does not exist,
      say nothing about it and locate the modules by search.
   3. Resolve mode, language and profile with their sources, and the slug
@@ -175,8 +177,11 @@ Fix what is analyzed, how, and where it is delivered, before reading code.
      contracts file describes (`prior/report.md`, plus `prior/findings.json`
      when the previous workspace has one) and record `prior_report`. If an
      existing file at that path is not a systemic report of this scope (a
-     name collision), keep it, choose a different slug, write alongside, and
-     say so in chat.
+     name collision), keep it byte for byte, use `<slug>-systemic` (or the
+     next free `-systemic-2`, …) as the slug, write alongside, and say so in
+     chat. A heading that merely mentions the scope does not make a file a
+     systemic report: it must have the report structure (the count line and
+     `### [severity] [LABEL]` headings or the no-findings statement).
 - **Outputs**: `run.json`, `00-scope.md`.
 - **Invariants**: the mode is `full` only if the user asked for it. A previous
   report does not set the mode.
@@ -345,7 +350,8 @@ the invariant is violated. Running code is not asserting it.
      F0 searched and found none (say where); `out_of_scope` when tests exist
      but were excluded (say why). With `absent`, every invariant is
      `uncovered` and every finding `undetected`; with `out_of_scope`, every
-     invariant is `not_verifiable`.
+     invariant is `not_verifiable` and every finding `not_assessed` — do
+     not open the excluded tests.
   2. **Inventory the tests** `X-n`: name, the operators each one drives, and
      its technique, judged from the body, not the name.
   3. **Coverage per invariant.** Re-open the test files and, for each
@@ -362,7 +368,8 @@ the invariant is violated. Running code is not asserting it.
      and `guarded` cells some test drives (a guarded cell needs a test that
      expects the refusal).
   6. **Findings against the suite.** Classify every confirmed finding as
-     `detected`, `undetected` or `enshrined`.
+     `detected`, `undetected` or `enshrined` (`not_assessed` when the suite
+     is out of scope).
   7. **Counts.** Leave `by_category` to the validator: write `{}`, run G5,
      copy the JSON it reports as expected, run G5 again. That first, planned
      failure is logged as `gate_failed` but does not count toward the two

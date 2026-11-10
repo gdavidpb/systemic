@@ -257,7 +257,9 @@ También te dice, para cada hallazgo, si tu suite lo **detecta**
 hallazgos consagrados van primero: son aquellos en los que corregir el
 código rompe tu build. Estas brechas se reportan en su propia sección; nunca
 añaden hallazgos ni cambian severidades. Si el alcance no tiene pruebas, el
-reporte lo dice y cada invariante figura como `uncovered`.
+reporte lo dice y cada invariante figura como `uncovered`. Si le pides que
+deje fuera las pruebas, no las abre, y el reporte dice que la cobertura no se
+evaluó en lugar de afirmar que algo no está probado.
 
 ## Modos de salida
 

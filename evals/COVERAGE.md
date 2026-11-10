@@ -53,6 +53,7 @@ row here and the case that covers it.
 | Finding `detected` (a red test) | 17 | `FixtureSuites` |
 | Finding `enshrined` | 15, 17 | `G5Tests`, `FixtureSuites` |
 | Finding `undetected` | 15, 17, 19 | `G5Tests` |
+| Finding `not_assessed` (tests excluded) | 20 | `G5Tests` |
 | Suite `in_scope` | 15, 16, 17 | golden run |
 | Suite `absent` | 5, 10, 19 | `G5Tests` |
 | Suite `out_of_scope` | 20 | — |
@@ -80,7 +81,7 @@ row here and the case that covers it.
 | Behavior | Forward evals | Deterministic |
 |---|---|---|
 | `needs_scope` on an unfocused repository | 18 | `G0Scope` |
-| graphify read first and disclosed in `full` | 18, 19 | — |
+| graphify read first and disclosed in `full` | 18, 19 | `G7Report` |
 | Design document with no code | 2 | — |
 | Real repository | 3 | — |
 | Report outside fixtures and read-only targets | all | `G0Scope` |

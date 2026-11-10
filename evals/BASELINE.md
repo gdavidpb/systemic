@@ -58,7 +58,8 @@ detection is not where the skill earns its cost.
   mutation check (28 mutants in `job-leases`, 29 in `approvals`), which
   showed that about half of the injected breakages pass the suite. The skill
   forbids running the suite, so it can say that a test would fail but not
-  show it.
+  show it. Since then the skill can do this too, but only when the user
+  allows it (`references/execution.md`); these runs were read-only.
 - It cost about half the tokens and a third of the time.
 
 **One disagreement on severity.** In `approvals` the skill run rated the
@@ -67,8 +68,11 @@ skill run pointed at two texts that disagree: the rubric in `SKILL.md` puts
 any incorrect behavior a user can observe at `high`, while
 `references/checks.md` (check 10) says `medium` when the derived value is
 presentation-only, which is what the fixture's README declares. The
-assertion accepts `high` with a stated reason, so it passes; the conflict
-between the two texts is real and is not resolved here.
+assertion accepts `high` with a stated reason, so it passes. The conflict
+between the two texts was real. It was resolved afterwards in the general
+rule, not against this case: both now say that a wrong value which is only
+displayed, which nothing decides on and which can be recomputed is
+`medium`. The table above is the run before that change.
 
 ## Limits of this measurement
 

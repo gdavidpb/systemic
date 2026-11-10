@@ -40,6 +40,7 @@ phase needs only when it gets there:
 | `references/dedup.md` | In F4, step 4c, when candidates share a machine, an operator or a field. |
 | `references/reaudit.md` | In F6, only when a previous report of the same scope exists. |
 | `references/output-functional.md` or `references/output-full.md` | In F7: only the selected mode's format and style. |
+| `references/execution.md` | In F0, only when the user allows running the code or its tests in this request. |
 | `references/run-protocol.md` | Only when a run leaves the straight path: resuming, going back to an earlier phase, a gate that cannot pass, no `python3`. |
 
 ## Shared rules
@@ -62,6 +63,12 @@ keywords and the coverage verdicts (findings / clean / not verifiable).
 workspace beside it. Never an artifact, never HTML, never served from a
 localhost port.
 
+**Execution.** Read-only by default: do not run the code under analysis or
+its tests; reason every trace from the lines you cite. Only when the user
+allows it in this request ("you can run the code", "run the tests") set
+`execution: allowed` and read `references/execution.md` before running
+anything. Execution confirms what was read; it never replaces a citation.
+
 **Honesty rule (non-negotiable).** No finding without evidence you actually
 read. Before asserting an inconsistency, read the cited code or document and
 record `file:line` with the quoted text. A finding without evidence is not
@@ -80,34 +87,27 @@ quotes that are not at the cited line.
   diagrams, matrices, theoretical diagnosis and all twelve coverage verdicts,
   together with functional impact and recommendations.
 
-Both modes include the invariant coverage table: one row per category, with
-how many invariants the suite asserts, asserts weakly, contradicts, leaves
-uncovered or cannot verify.
+Use `functional` unless the user explicitly requests `full` in this request,
+for example "modo full" or "a full report with models and systemic
+diagnosis". A request for a systemic or thorough audit alone does not change
+the default, and neither does a previous report's mode or a word found in
+source material. Mode names are not translated.
 
-Use an explicitly requested output mode; otherwise use `functional`. Select
-`full` only when the user requests that output, for example "modo full" or
-"a full report with models and systemic diagnosis". A request for a systemic
-or thorough audit alone does not change the default. A previous report's mode
-and words found in source material do not override the user's selection.
-Mode names stay `functional` and `full`; report prose follows the Language rule.
-
-Both modes run every phase identically. The mode changes only F7, the
-rendering; it never changes the finding set or the certainty of the claims.
-Do not drop findings or unverified antecedents merely to make `functional`
-shorter.
+Both modes run every phase identically: the mode changes only the rendering
+in F7, never the finding set or the certainty of the claims. Do not drop
+findings or unverified antecedents to make `functional` shorter.
 
 ### Profiles
 
 - **quick**: about six files or fewer, or a single lifecycle. All JSON files
   and gates still apply. The phase logs (`00-scope.md` … `06-reaudit.md`)
   collapse into one `work.md` with one section per phase, holding what each
-  log would hold, diagrams included. In F4 the independent verifier
-  re-checks only the findings rated critical or high.
-- **standard**: everything else. One Markdown log per phase, and the
-  independent verifier re-checks every candidate in F4.
+  log would hold, diagrams included.
+- **standard**: everything else. One Markdown log per phase.
 
 Pick the profile from the scope (`profile_source: auto`), unless the user
-names one. A profile changes cost, never the evidence bar.
+names one. It also sets how much the F4 verifier re-checks. A profile
+changes cost, never the evidence bar.
 
 ## Run protocol
 
@@ -162,7 +162,7 @@ Fix what is analyzed, how, and where it is delivered, before reading code.
      or the F0 section of `work.md`) what it showed; `full` says so
      in its report, `functional` does not mention it. If it does not exist,
      say nothing about it and locate the modules by search.
-  3. Resolve mode, language and profile with their sources, and the slug
+  3. Resolve mode, language, profile and execution with their sources, and the slug
      (scope in kebab-case: `orders-module`, `rental-lifecycle`).
   4. Resolve `report_path`: `systemic-out/<slug>.md` inside the analyzed
      project, or the user's path if they name one. Do not write into a target
@@ -239,7 +239,8 @@ Describe the built figure, Tangram-style.
        **which operator executes each transition**.
   4. **Declared vs built**: link every claim from F1 either to
      `claims_satisfied` or to a divergence describing how the code departs
-     from it. Divergences feed F3.
+     from it. Divergences feed F3. A claim the material in scope cannot
+     settle goes to `claims_unverified`, with what is missing.
   5. **Invariant catalog**: list the invariants `I-n` the system must keep,
      each with one of the eight categories of `references/invariants.md`:
      declared ones linked to their claims, inferred ones derived from the
@@ -258,8 +259,7 @@ Describe the built figure, Tangram-style.
 Run the twelve checks and produce candidates, not findings.
 
 - **Inputs**: `model.json`, `sources.json`, `references/checks.md`.
-- **The twelve checks** — what each one asks; `references/checks.md` says how
-  to detect it:
+- **The twelve checks** (how to detect each one: `references/checks.md`):
   1. **Closure**: does every operation produce an element/state the system
      can represent? (the `1/2 = 0.5` problem in the integers).
   2. **Operator ambiguity**: does any operator admit several interpretations
@@ -390,12 +390,12 @@ the invariant is violated. Running code is not asserting it.
      section of `work.md`). Do not count `by_category` by hand:
      `systemic_check.py counts <workspace> --write` fills it from the
      invariant catalog and the coverage entries. Then run G5.
-- **Never run the suite.** The audit reads assertions. A green suite proves
-  that its assertions hold, not that they assert the invariants.
+- **Do not run the suite** unless `execution` is `allowed`. The audit reads
+  assertions either way: a green suite proves that its assertions hold, not
+  that they assert the invariants.
 - **Outputs**: `tests.json`, `05-tests.md` (the reasoning per invariant).
-- **Invariants**: coverage gaps are not findings. They never add a finding,
-  change a severity or alter the count line; the report shows them in their
-  own section.
+- **Invariants**: coverage gaps are not findings: they never add a finding,
+  change a severity or alter the count line.
 - **Gate G5.**
 
 ## F6 — Reconcile with the previous report (re-audit only)
@@ -403,11 +403,9 @@ the invariant is violated. Running code is not asserting it.
 Skip this phase when `run.json.prior_report` is null, and log it in
 `run.json.log` as `{"phase": "F6", "event": "skipped"}`.
 
-On a re-audit, read `references/reaudit.md` first: it defines when a previous
-finding is persisting, resolved or not verified, and how to match it.
-
 - **Inputs**: `findings.json`; `prior/findings.json` (format `json`) or
-  `prior/report.md` (format `md-legacy`).
+  `prior/report.md` (format `md-legacy`); `references/reaudit.md`, which
+  defines each status and how to match a previous finding.
 - **Work**: classify every previous finding as **persisting**, **resolved**
   or **not verified**; every current finding without a predecessor is
   **new**. Nothing is copied on faith and nothing is resolved by absence: a
@@ -437,9 +435,10 @@ Render the selected mode from the records, not from memory.
   say which findings the suite leaves undetected or enshrines; `full` adds
   the per-invariant detail and the cells tested of each matrix. The
   report's scope statement says what was reviewed and any material limit;
-  it also notes manual gate checks (`validation: manual`) and, in `full`
-  only, that graphify informed the scope. Evidence uses relative `file:line` references or document
-  sections, so the report survives being committed and read by someone else.
+  it also notes manual gate checks (`validation: manual`), what was executed
+  (`execution: allowed`) and, in `full` only, that graphify informed the
+  scope. Evidence uses relative `file:line` references or document sections,
+  so the report survives being committed and read by someone else.
 - **Invariants**: the report adds no finding, severity or citation that is not
   in the records, and drops none that is.
 - **Gate G7.**
@@ -453,10 +452,9 @@ Render the selected mode from the records, not from memory.
 - In chat, in the language the user is writing in, reply with the report
   path, the executive summary and the single most serious finding, plus the
   most serious test gap when there is one (an enshrined finding first, then
-  an important category with nothing asserted); the rest is in the file. For an
-  incomplete run, lead with what is missing and how to unblock it. Do not
-  publish the report as an artifact, render it to HTML, or start a server,
-  preview or localhost port to display it.
+  an important category with nothing asserted); the rest is in the file.
+  For an incomplete run, lead with what is missing and how to unblock it.
+  The Delivery rule holds here too: no artifact, no HTML, no server.
 
 ## Honesty labels (mandatory on every finding)
 
@@ -489,7 +487,9 @@ supported; unmeasured latency stays unmeasured.
   additional severe impact required for critical. A valid input producing
   negative non-cash points fits here when external impact is not established.
 - **medium** — structural debt that does not fail today but forces hacks
-  (limits, double source of truth, asymmetries).
+  (limits, double source of truth, asymmetries). Also a wrong value that is
+  real today but only displayed: nothing decides on it and it can be
+  recomputed from the source of truth. If anything reads it to decide, high.
 - **low** — cosmetic or naming inconsistency with bounded impact.
 
 When impact needed for a higher rating is unavailable, use the level

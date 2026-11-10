@@ -46,7 +46,8 @@ medium if it is a latent trap.
 transition, an explicit prohibition (guard with a clear error), or — the
 finding — a **hole**: the operation proceeds without considering that state.
 **Detect**: build the matrix (it is written to `checks.json.matrices`, one
-cell per state × operator; every `hole` names its candidate or a note). Look for operators that mutate state without
+cell per state × operator; every `hole` names its candidate or a note). The
+columns are the operators that read or write the machine's fields. Look for operators that mutate state without
 checking the current state (missing guard). Contrast with declared rules ("a
 shipped order cannot be canceled") — a missing guard that contradicts a
 declared rule is an INCONSISTENCY, not just a hole.
@@ -138,8 +139,9 @@ Also trace mutable inputs or returned references: a caller retaining an item
 stored by reference may change the underlying values outside those guarded
 writers. Require a concrete accessible alias path and state its ownership
 and mutation condition; do not infer arbitrary external writes without one.
-**Severity**: high if both are used for decisions; medium if the derived one
-is presentation-only.
+**Severity**: high if anything decides on the value that drifts; medium if
+it is only displayed and can be recomputed from the source of truth, even
+when it already shows a wrong number (the rubric's medium says the same).
 
 ## 11. System limits
 

@@ -98,9 +98,13 @@ Each invariant gets exactly one level:
 - **uncovered** — no test touches it. Say what you searched for.
 - **not_verifiable** — the tests are outside the scope or could not be read.
 
-Never run the suite. A green suite proves the assertions hold, not that they
-assert the invariants; a red suite proves nothing about which invariant
-broke. Read the assertions.
+Do not run the suite: by default the skill executes nothing. A green suite
+proves the assertions hold, not that they assert the invariants; a red suite
+proves nothing about which invariant broke. Read the assertions. When the
+user allowed execution (`run.json.execution: allowed`), running a test can
+confirm what reading concluded — that a `detected` test is red, or that an
+`asserted` one turns red when the invariant is broken in a copy — but the
+level is still decided from the assertion; see `references/execution.md`.
 
 ## Traps that look like coverage
 

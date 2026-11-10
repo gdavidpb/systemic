@@ -22,7 +22,7 @@ are listed apart at the end and do not close a gap in the tables below.
 |---|---|---|---|
 | 1 | Closure | 1, 4, 8, 14 (refund_pending) | 6 |
 | 2 | Operator ambiguity | 1 (apply_discount), 2 (good condition) | 12 |
-| 3 | Transition completeness | 1, 17, 19 | 6, 7 (decorator guards) |
+| 3 | Transition completeness | 1, 17, 19 | 6, 7 (decorator guards); `G3Checks` (a matrix has a column for every operator that moves the machine) |
 | 4 | Reachability | 1 (in_review), 5 (dead-letter), 19 (trial_ends) | 6, 7 (void is terminal) |
 | 5 | Illegal states representable | 1 (mark_paid), 2 (suspended), 17 (sold unit changes hands) | 6 |
 | 6 | Invariants and partial failure | 1 (ship), 5 (compensation), 17 (sell before charge) | 6 |
@@ -38,6 +38,7 @@ are listed apart at the end and do not close a gap in the tables below.
 | Behavior | Forward evals | Deterministic |
 |---|---|---|
 | Catalog with every machine covered | 15, 16, 17 | `G2Model` |
+| A claim the scope cannot settle is recorded as unverified, not as a divergence | 9, 13 (exercised by the fixture, not asserted) | `UnverifiedClaims` |
 | Implicit machine (co-varying fields) | 17 | `G2Model` (fields required) |
 | Category left empty when nothing supports it | 15, 16 (concurrency, atomicity) | — |
 | `asserted` with the right technique | 15 (deliver guard), 16, 17 | `G5Tests` (technique fit) |
@@ -67,7 +68,9 @@ are listed apart at the end and do not close a gap in the tables below.
 | Suite `absent` | 5, 10, 19 | `G5Tests` |
 | Suite `out_of_scope` | 20 | — |
 | Matrix cells tested | 16 (all), 17 | `G5Tests`, `G7Report` |
-| The suite is read, never run | 15, 16, 17 | — |
+| The suite is read, never run (the default) | 15, 16, 17 | `Execution` (no field means read-only; `traces/` needs `allowed`) |
+| Execution only when the user allows it, confirming what was read | 26 | `Execution` (`allowed` needs `explicit`) |
+| The analyzed project is never changed | 26 | `G4Findings` (a changed source fails its hash) |
 | Gaps never become findings or change counts | 15, 17 | `G7Report` |
 
 ## Audit of the findings (F4)
@@ -82,6 +85,7 @@ are listed apart at the end and do not close a gap in the tables below.
 | Missing guards on one declared machine are one finding | 1 | `G4Findings` (a second one needs `separate_because`) |
 | Independent causes stay separate | 7, 10 | `AdversarialFixtures` |
 | Severity by damage, not domain | 1, 10 | — |
+| A wrong value that is only displayed is `medium` | 25 (held out) | — |
 | Justified `critical` (scope, why unrecoverable) | 17 (sweep deletes sales) | `G4Findings` |
 | `low` for a bounded fragility | 6, 7 | — |
 | Conditional impact without invented latency | 5 | `AdversarialFixtures` |

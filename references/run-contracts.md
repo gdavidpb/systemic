@@ -14,6 +14,7 @@ systemic-out/
     ├── tests.json      F5
     ├── reaudit.json    F6, only when a previous report exists
     ├── prior/          F0, only on a re-audit: report.md (+ findings.json)
+    ├── traces/         only when the user allowed execution: the scripts run **[gate]**
     └── 00-scope.md … 06-reaudit.md   phase logs (profile standard)
         or work.md                    single log (profile quick), one
                                       `## F<n>` section per phase that has a
@@ -62,6 +63,7 @@ Conventions:
 | `source_ref` | `{"commit": <sha or null>, "dirty": <bool or null>}` |
 | `validation` | `script` when the validator ran; `manual` when it could not |
 | `graph_informed` | `true` when `graphify-out/graph.json` informed the scope; omitted or `false` otherwise |
+| `execution`, `execution_source` | `read_only`\|`allowed`; `explicit`\|`default`. Omitted means `read_only`. `allowed` requires `explicit`: the user said in this request that the code or its tests may be run **[gate]**. See `references/execution.md` |
 | `phase` | the phase in progress, `F0`…`F8`; an incomplete run keeps the phase whose gate failed **[gate]** |
 | `status` | `in_progress`, `needs_scope`, `complete`, `incomplete` |
 | `scope_proposal` *(text)* | required when `status` is `needs_scope` **[gate]** |
@@ -124,6 +126,7 @@ rest of the previous workspace, including any older `prior/`.
                                   "operator": "O-7", "evidence": [cite]}]}],
   "divergences": [{"id": "V-1", "claims": ["D-2"], "description": "…", "evidence": [cite]}],
   "claims_satisfied": ["D-7"],
+  "claims_unverified": [{"claim": "D-9", "reason": "the refund-service that enforces it is outside the scope"}],
   "invariants": [{"id": "I-6", "category": "repetition",
                   "statement": "Redelivering a payment event leaves total_paid unchanged",
                   "machine": null, "operators": ["O-10"], "source": "declared",
@@ -137,7 +140,22 @@ rest of the previous workspace, including any older `prior/`.
   (no guard).
 - Every transition names a modeled operator and states of its machine **[gate]**.
 - An `implicit` machine (co-varying flags and nullable fields) lists `fields` **[gate]**.
-- Every claim is either in `claims_satisfied` or linked to a divergence **[gate]**.
+  It usually has no declaration: `declared_states` is `[]` and `declared_in`
+  cites the nearest thing to one (a schema line, a table in the README).
+- What the scope does not show is recorded as unknown, not guessed:
+  `initial: null`, `terminal: []` and `transitions: []` are valid for a
+  machine whose writers live outside the scope.
+- A transition names the operator that performs it. One caused by time (a
+  lease that expires) names the operator that observes it (a reaper, a
+  sweep). If nothing in scope observes it, it is not a transition: say in
+  the element's `representation` that the state is derived when read.
+- Every claim is in exactly one of three places **[gate]**: in
+  `claims_satisfied`; linked to a divergence, when the code departs from
+  it; or in `claims_unverified` with a `reason` *(text)*, when the material
+  in scope cannot settle it either way (the behavior is delegated to a
+  service outside the scope, the claim is about a property no file shows).
+  An unverified claim is not a divergence: it produces no candidate, and
+  `full` lists it under its limits.
 - `invariants` is the catalog of `references/invariants.md`. Each has a
   unique `I-n`, a `category` among `state`, `transition`, `logical`,
   `temporal`, `repetition`, `concurrency`, `atomicity`, `algebraic`, a
@@ -172,13 +190,22 @@ rest of the previous workspace, including any older `prior/`.
 - `RISK` candidates need `condition` *(text)*; `AMBIGUITY` candidates need
   `question` *(text)* **[gate]**.
 - Every machine with ≤ 8 declared states (built states when none are
-  declared) has a matrix unless check 3 is `not_verifiable` **[gate]**. It has
-  a row for every built state and one cell per operator **[gate]**:
+  declared) has a matrix unless check 3 is `not_verifiable` **[gate]**. Its
+  columns are the operators that read or write the machine's fields: every
+  operator that performs one of its transitions **[gate]**, plus those that
+  act on it without moving it. Leave out an operator that never touches the
+  machine. It has a row for every built state, including a declared state
+  nothing writes (fill it from what each operator would do there), and one
+  cell per operator **[gate]**:
   - `defined`: the operator performs a transition the declared rules allow
     from this state.
   - `guarded`: the operator refuses this state with an explicit check.
     An operator that deliberately leaves this state untouched (a sweep that
-    filters it out, an idempotent no-op) is also `guarded`, with a note.
+    filters it out, an idempotent no-op) is also `guarded`, with a note. So
+    is a refusal that works through another field (a holder check that
+    fails because `leased_by` is null), when an invariant ties that field
+    to the state; the note names the field, and a state the code can reach
+    with that field still set is a `hole`.
   - `hole`: the operator proceeds without considering this state, including
     a write the declared rules forbid.
   Every `hole` has a note naming a candidate (`candidate`, or `candidates`

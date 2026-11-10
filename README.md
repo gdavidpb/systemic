@@ -209,7 +209,7 @@ So after auditing the code, `systemic` audits your tests against the same
 model. It writes down the invariants your lifecycle must keep — the ones your
 README declares and the ones the model implies — and for each one it looks
 for the assertion that would fail if the invariant broke. It reads the tests;
-it never runs them.
+unless you ask it to, it never runs them.
 
 Invariants come in eight kinds, and each kind can only be caught by a certain
 kind of test:
@@ -256,6 +256,38 @@ tests, the report says so and every invariant reads as uncovered. If you ask
 it to leave the tests out, it does not open them, and the report says
 coverage was not assessed rather than claiming anything is untested.
 
+## Letting it run your code
+
+By default `systemic` is **read-only**. It does not run your code and it does
+not run your tests: every finding rests on lines it read and cites, which
+you can check without trusting its machine. Running someone's code has side
+effects nobody asked for, and a green or red suite answers a different
+question from "which rules do these assertions defend?".
+
+You can lift that for one run by saying so:
+
+```
+/systemic audit the order lifecycle in src/orders — you can run the code and the tests to confirm
+```
+
+Then it uses execution to **confirm** what reading found, never to replace
+it:
+
+- it reproduces the trace of a finding (the operators, in order, and the
+  state they leave) before reporting it;
+- it runs the test it says detects a defect, to see it red, and the one it
+  says enshrines a defect, to see it green;
+- for an invariant it calls `asserted`, it can break the rule in a copy of
+  your code and check that the cited test notices — the one thing reading
+  alone cannot show.
+
+It still works under limits: it never changes the project it analyzes
+(mutations happen in a copy, and the validator re-hashes every source), it
+calls no network, database or external service, and it installs nothing. The
+scripts it ran are kept in the workspace under `traces/`, and the report
+says what was executed and what was left as reasoned. The permission is for
+that run only: a later run is read-only again unless you repeat it.
+
 ## Output modes
 
 **`functional` is the default; `full` adds the systemic detail.** Both run
@@ -296,7 +328,8 @@ Every finding carries one honesty label:
 Severity is `critical` / `high` / `medium` / `low`, rated by the damage the
 finding actually causes. Critical requires supported severe material loss,
 irreversibility or persistent corruption with severe impact; a monetary
-domain or invalid value alone is not enough. **Confidence** (high / medium /
+domain or invalid value alone is not enough. A wrong value that is only
+displayed, that nothing decides on and that can be recomputed, is medium. **Confidence** (high / medium /
 low) is separate from severity: it says how well the diagnosis is supported,
 not how bad it is.
 
@@ -446,10 +479,11 @@ references/
   output-functional.md        functional report format and style (default)
   output-full.md              detailed systemic report format and style
   run-protocol.md             resuming, going back a phase, a gate that cannot pass, no Python
+  execution.md                running the code or its tests, only when the user allows it
 scripts/
   systemic_check.py           the gate validator and its helpers (Python 3.9+, standard library)
 evals/
-  evals.json                  25 forward evals with assertions; 24 and 25 are held out
+  evals.json                  26 forward evals with assertions; 24 and 25 are held out
   trigger-evals.json          queries that should and should not trigger the skill
   COVERAGE.md                 which eval and test covers each behavior of the skill
   BASELINE.md                 the held-out cases with the skill and without it
@@ -507,7 +541,8 @@ request `full`; 11–13 exercise mode selection and history across modes; 15
 and 16 exercise the test audit; 17–20 cover concurrency, system limits,
 a justified critical, scope proposals, graphify, name collisions, the
 standard profile and excluded tests; 21–23 cover resuming an interrupted
-run, checking the gates by hand without Python, and an incomplete run.
+run, checking the gates by hand without Python, and an incomplete run; 26
+covers a run where the user allowed execution.
 [`evals/COVERAGE.md`](evals/COVERAGE.md) maps every behavior of the skill to
 the evals and tests that cover it.
 

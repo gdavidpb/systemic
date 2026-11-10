@@ -38,6 +38,7 @@ VERDICTS = {"findings", "clean", "not_verifiable"}
 REPORT_VERDICTS = {"findings": "findings", "clean": "clean", "not_verifiable": "not verifiable"}
 CELLS = {"defined", "guarded", "hole"}
 CONFIDENCE = {"high", "medium", "low"}
+EXECUTION = {"read_only", "allowed"}
 VERIFICATION = {"independent", "self"}
 REAUDIT = {"persisting", "resolved", "not_verified"}
 ROLES = {"source", "test"}
@@ -343,6 +344,15 @@ def g0(ctx):
         e.append(f"G0 run.json.phase: must be F0..{FINAL_PHASE}")
     if run.get("graph_informed", False) not in {True, False}:
         e.append("G0 run.json.graph_informed: must be true or false")
+    execution = run.get("execution", "read_only")
+    if execution not in EXECUTION:
+        e.append("G0 run.json.execution: must be read_only or allowed")
+    if "execution" in run and run.get("execution_source") not in {"explicit", "default"}:
+        e.append("G0 run.json.execution_source: must be explicit or default")
+    if execution == "allowed" and run.get("execution_source") != "explicit":
+        e.append("G0 run.json.execution: allowed requires execution_source 'explicit' (the user asked for it)")
+    if execution != "allowed" and (ctx.run_dir / "traces").exists():
+        e.append("G0 traces/: scripts that execute the code exist, but run.json.execution is not allowed")
     if run.get("validation") not in {"script", "manual"}:
         e.append("G0 run.json.validation: must be script or manual")
     if not ctx.source_root.is_dir():
@@ -531,8 +541,23 @@ def g2(ctx):
                 e.append(f"G2 {where}.claims: unknown claim {ref}")
             linked.add(ref)
         check_cites(ctx, div.get("evidence"), f"{where}.evidence", e, "G2")
-    for claim in sorted(claims - linked):
-        e.append(f"G2 model.json: claim {claim} is neither satisfied nor linked to a divergence")
+    unverified = set()
+    for i, entry in enumerate(model.get("claims_unverified") or []):
+        where = f"model.json.claims_unverified[{i}]"
+        ref = entry.get("claim") if isinstance(entry, dict) else None
+        if ref not in claims:
+            e.append(f"G2 {where}.claim: unknown claim {ref!r}")
+            continue
+        if ref in linked:
+            e.append(f"G2 {where}.claim: {ref} is already satisfied or linked to a divergence; "
+                     f"a claim the scope cannot settle is neither")
+        if ref in unverified:
+            e.append(f"G2 {where}.claim: {ref} is listed twice")
+        unverified.add(ref)
+        need_text(entry, "reason", where, e, "G2")
+    for claim in sorted(claims - linked - unverified):
+        e.append(f"G2 model.json: claim {claim} is neither satisfied, linked to a divergence "
+                 f"nor recorded in claims_unverified with what is missing")
     machine_ids = set(ids(model.get("machines"), "M-"))
     invariants = model.get("invariants")
     if not isinstance(invariants, list):
@@ -645,6 +670,9 @@ def g3(ctx):
         for op in ops:
             if op not in operators:
                 e.append(f"G3 {where}.operators: unknown operator {op}")
+        movers = {tr.get("operator") for tr in machine.get("transitions") or [] if isinstance(tr, dict)}
+        for op in sorted(o for o in movers - set(ops) if isinstance(o, str) and o in operators):
+            e.append(f"G3 {where}.operators: {op} performs a transition of {matrix['machine']} and needs a column")
         rows = matrix.get("rows") or {}
         notes = matrix.get("notes") or {}
         for state in machine.get("states") or []:

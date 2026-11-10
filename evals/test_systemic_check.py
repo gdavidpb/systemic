@@ -191,6 +191,33 @@ class G1Sources(GateTestCase):
         self.assertFails("G2", "outside the ranges recorded as read")
 
 
+class Execution(GateTestCase):
+    """The code under analysis is not executed unless the user allowed it."""
+
+    def test_a_run_without_the_field_is_read_only(self):
+        self.assertNotIn("execution", self.ws.read("run.json"))
+        code, out = self.ws.check("G0")
+        self.assertEqual(code, 0, out)
+
+    def test_allowed_needs_the_user_to_have_asked(self):
+        self.ws.edit("run.json", lambda d: d.update(execution="allowed", execution_source="default"))
+        self.assertFails("G0", "allowed requires execution_source 'explicit'")
+
+    def test_allowed_and_explicit_is_accepted(self):
+        self.ws.edit("run.json", lambda d: d.update(execution="allowed", execution_source="explicit"))
+        (self.ws.run_dir / "traces").mkdir()
+        code, out = self.ws.check("all")
+        self.assertEqual(code, 0, out)
+
+    def test_unknown_value(self):
+        self.ws.edit("run.json", lambda d: d.update(execution="sandboxed", execution_source="explicit"))
+        self.assertFails("G0", "must be read_only or allowed")
+
+    def test_trace_scripts_need_execution_to_be_allowed(self):
+        (self.ws.run_dir / "traces").mkdir()
+        self.assertFails("G0", "run.json.execution is not allowed")
+
+
 class HashHelper(GateTestCase):
     def test_hash_reproduces_the_recorded_sources(self):
         code, out = self.ws.check_raw(["hash", str(self.ws.run_dir)])
@@ -246,6 +273,42 @@ class G2Model(GateTestCase):
     def test_declared_invariant_names_its_claims(self):
         self.ws.edit("model.json", lambda d: d["invariants"][1].update(claims=[]))
         self.assertFails("G2", "names the claims that declare it")
+
+
+class UnverifiedClaims(GateTestCase):
+    """A claim the material in scope cannot settle is recorded as such, with what is missing."""
+
+    def _unlink(self, d):
+        claim = d["claims_satisfied"].pop()
+        return claim
+
+    def test_a_claim_needs_one_of_three_places(self):
+        self.ws.edit("model.json", self._unlink)
+        self.assertFails("G2", "nor recorded in claims_unverified")
+
+    def test_unverified_with_what_is_missing_is_accepted(self):
+        def move(d):
+            claim = self._unlink(d)
+            d["claims_unverified"] = [{"claim": claim, "reason": "The service that enforces it is outside the scope"}]
+        self.ws.edit("model.json", move)
+        code, out = self.ws.check("G2")
+        self.assertEqual(code, 0, out)
+
+    def test_unverified_needs_a_reason(self):
+        def move(d):
+            d["claims_unverified"] = [{"claim": self._unlink(d), "reason": "n/a"}]
+        self.ws.edit("model.json", move)
+        self.assertFails("G2", "claims_unverified[0].reason")
+
+    def test_a_settled_claim_is_not_unverified(self):
+        self.ws.edit("model.json", lambda d: d.update(
+            claims_unverified=[{"claim": d["claims_satisfied"][0], "reason": "Recorded twice by mistake here"}]))
+        self.assertFails("G2", "already satisfied or linked to a divergence")
+
+    def test_unknown_claim(self):
+        self.ws.edit("model.json", lambda d: d.update(
+            claims_unverified=[{"claim": "D-99", "reason": "No such claim was recorded in F1"}]))
+        self.assertFails("G2", "unknown claim 'D-99'")
 
 
 class G5Tests(GateTestCase):
@@ -420,6 +483,17 @@ class G3Checks(GateTestCase):
     def test_all_twelve_checks_are_recorded(self):
         self.ws.edit("checks.json", lambda d: d["checks"].pop(6))
         self.assertFails("G3", "ids 1..12 exactly once")
+
+    def test_a_matrix_has_a_column_for_every_operator_that_moves_the_machine(self):
+        def drop(d):
+            matrix = d["matrices"][0]
+            index = len(matrix["operators"]) - 1
+            matrix["operators"].pop(index)
+            for state, row in matrix["rows"].items():
+                row.pop(index)
+        self.ws.edit("checks.json", drop)
+        code, out = self.ws.check("G3")
+        self.assertIn("performs a transition of M-1 and needs a column", out)
 
     def test_clean_needs_substantive_evidence(self):
         self.ws.edit("checks.json", lambda d: d["checks"][11].update(verified="ok"))

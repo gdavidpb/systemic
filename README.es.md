@@ -212,7 +212,7 @@ Por eso, después de auditar el código, `systemic` audita tus pruebas contra
 el mismo modelo. Anota los invariantes que tu ciclo de vida debe mantener
 —los que declara tu README y los que se deducen del modelo— y, para cada
 uno, busca la aserción que fallaría si el invariante se rompiera. Lee las
-pruebas; nunca las ejecuta.
+pruebas; salvo que se lo pidas, nunca las ejecuta.
 
 Los invariantes son de ocho tipos, y cada tipo solo lo detecta cierto tipo
 de prueba:
@@ -261,6 +261,39 @@ reporte lo dice y cada invariante figura como `uncovered`. Si le pides que
 deje fuera las pruebas, no las abre, y el reporte dice que la cobertura no se
 evaluó en lugar de afirmar que algo no está probado.
 
+## Dejar que ejecute tu código
+
+Por defecto `systemic` es de **solo lectura**. No ejecuta tu código ni tus
+pruebas: cada hallazgo se apoya en líneas que leyó y cita, y que puedes
+comprobar sin fiarte de su máquina. Ejecutar código ajeno tiene efectos que
+nadie pidió, y una suite en verde o en rojo responde a otra pregunta, no a
+«¿qué reglas defienden estas aserciones?».
+
+Puedes levantar esa restricción para una ejecución diciéndolo:
+
+```
+/systemic audita el ciclo de vida de órdenes en src/orders — puedes ejecutar el código y las pruebas para confirmar
+```
+
+Entonces usa la ejecución para **confirmar** lo que encontró leyendo, nunca
+para sustituirlo:
+
+- reproduce la traza de un hallazgo (los operadores, en orden, y el estado
+  que dejan) antes de reportarlo;
+- ejecuta la prueba que dice que detecta un defecto, para verla en rojo, y
+  la que dice que lo consagra, para verla en verde;
+- para un invariante que califica como `asserted`, puede romper la regla en
+  una copia de tu código y comprobar que la prueba citada lo nota: lo único
+  que la lectura sola no puede demostrar.
+
+Sigue trabajando con límites: nunca modifica el proyecto que analiza (las
+mutaciones se hacen en una copia, y el validador recalcula el hash de cada
+fuente), no llama a la red, a bases de datos ni a servicios externos, y no
+instala nada. Los scripts que ejecutó quedan en el espacio de trabajo, en
+`traces/`, y el reporte dice qué se ejecutó y qué quedó solo razonado. El
+permiso vale para esa ejecución: la siguiente vuelve a ser de solo lectura
+salvo que lo repitas.
+
 ## Modos de salida
 
 **`functional` es el modo por defecto; `full` añade el detalle sistémico.**
@@ -302,7 +335,8 @@ Cada hallazgo lleva una etiqueta de honestidad:
 La severidad es `critical` / `high` / `medium` / `low`, según el daño que el
 hallazgo causa de verdad. Critical exige una pérdida material grave,
 irreversibilidad o corrupción persistente con impacto grave, todo sustentado;
-un dominio monetario o un valor inválido no bastan. La **confianza** (high /
+un dominio monetario o un valor inválido no bastan. Un valor erróneo que solo se
+muestra, sobre el que nada decide y que puede recalcularse, es medium. La **confianza** (high /
 medium / low) es independiente de la severidad: dice qué tan sustentado está
 el diagnóstico, no qué tan grave es.
 
@@ -460,10 +494,11 @@ references/
   output-functional.md        formato y estilo del reporte functional (por defecto)
   output-full.md              formato y estilo del reporte sistémico detallado
   run-protocol.md             reanudar, volver a una fase anterior, una puerta que no puede pasar, sin Python
+  execution.md                ejecutar el código o sus pruebas, solo cuando el usuario lo permite
 scripts/
   systemic_check.py           el validador de puertas y sus ayudantes (Python 3.9+, biblioteca estándar)
 evals/
-  evals.json                  25 evals de ejecución con aserciones; la 24 y la 25 están reservadas
+  evals.json                  26 evals de ejecución con aserciones; la 24 y la 25 están reservadas
   trigger-evals.json          peticiones que deben y que no deben activar la skill
   COVERAGE.md                 qué eval y qué test cubre cada comportamiento de la skill
   BASELINE.md                 los casos reservados con la skill y sin ella
@@ -525,7 +560,8 @@ auditoría de pruebas; los 17–20 cubren concurrencia, límites del sistema, un
 crítico justificado, propuestas de alcance, graphify, colisiones de nombre,
 el perfil standard y pruebas excluidas; los 21–23, reanudar una ejecución
 interrumpida, revisar las puertas a mano sin Python y una ejecución
-incompleta. [`evals/COVERAGE.md`](evals/COVERAGE.md) mapea cada
+incompleta; el 26, una ejecución en la que el usuario permitió ejecutar
+código. [`evals/COVERAGE.md`](evals/COVERAGE.md) mapea cada
 comportamiento de la skill a las evals y pruebas que lo cubren.
 
 **Evals reservadas.** Los casos 24 y 25 (`"split": "holdout"`) existen para

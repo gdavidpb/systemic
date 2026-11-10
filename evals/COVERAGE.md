@@ -51,7 +51,7 @@ row here and the case that covers it.
 | Trap: `assertRaises(Exception)` | 17 | — |
 | Trap: concurrency without an interleaving | 17 | `G5Tests` |
 | Trap: setup that relies on a defect without asserting it | 15 | — |
-| Finding `detected` (a red test) | 17 | `FixtureSuites` |
+| Finding `detected` (a red test) | 17 | `FixtureSuites` (the validator cannot know a test is red without running it, which the skill forbids, so this stays eval-graded) |
 | Finding `enshrined` | 15, 17 | `G5Tests`, `FixtureSuites` |
 | Finding `undetected` | 15, 17, 19 | `G5Tests` |
 | Finding `not_assessed` (tests excluded) | 20 | `G5Tests` |
@@ -70,7 +70,7 @@ row here and the case that covers it.
 | Refutation: guard in a decorator, dedup in middleware, guarding caller | 7, 12 | — |
 | Refutation does not hide recovery defects | 7, 11 | `AdversarialFixtures` |
 | Dedup: one finding per root cause | 1 | `G4Findings` |
-| Missing guards on one declared machine are one finding | 1 | — |
+| Missing guards on one declared machine are one finding | 1 | `G4Findings` (a second one needs `separate_because`) |
 | Independent causes stay separate | 7, 10 | `AdversarialFixtures` |
 | Severity by damage, not domain | 1, 10 | — |
 | Justified `critical` (scope, why unrecoverable) | 17 (sweep deletes sales) | `G4Findings` |
@@ -101,7 +101,7 @@ row here and the case that covers it.
 | `not_verified` antecedent | 9, 13 | `G6Reaudit` |
 | Mode change keeps the history | 13 | — |
 | Resume an interrupted run from `run.json.phase` | 21 | `RunState` |
-| Source changed mid-run: explicit return to F1 | 21 | `InterruptedRun` |
+| Source changed mid-run: explicit return to F1 | 21 | `InterruptedRun`, `RunState` (redone log says `returned_to`) |
 | Incomplete run discloses why | 23 | `G0Scope`, `RunState` |
 | Gates checked by hand without Python | 22 | — |
 | No artifact, HTML or server | 1, 2, 3 | `G7Report` (no HTML) |

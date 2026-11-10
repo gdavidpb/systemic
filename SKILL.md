@@ -123,7 +123,9 @@ names one. A profile changes cost, never the evidence bar.
    part of the same run, not a fresh one), and redo it and everything after
    it: rebuild each phase's files from its inputs rather than editing them
    in place. In the quick profile, keep the `work.md` sections of the
-   phases before the one returned to and rewrite the rest. Never patch an
+   phases before the one returned to and rewrite the rest. The redone
+   phase's log opens with a line `returned_to: <reason>` (a fixed keyword,
+   in every language) **[gate]**. Never patch an
    earlier file silently.
 3. **Gates.** After writing a phase's files, run
    `python3 <skill-dir>/scripts/systemic_check.py <gate> <workspace>`. Fix
@@ -354,7 +356,9 @@ itself a system, and this phase is its consistency check.
     operator. This rule is the isolated-repair test applied to a machine —
     the shared repair is the transition function — so it wins over
     keeping each operator separate. Record the finding under check 3 and
-    list the other checks among its manifestations.
+    list the other checks among its manifestations. A second check-3
+    finding on the same machine needs `separate_because`: the rule or
+    defect that the transition table would not fix **[gate]**.
   - **4d Severity and confidence.** Rate each surviving finding against the
     rubric below (the damage it causes, not the check's typical ceiling) and
     give it a fingerprint derived from its root cause.

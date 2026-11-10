@@ -674,6 +674,33 @@ def g4(ctx):
     for cid in sorted(c for c in candidates if isinstance(c, str)):
         if cid not in owner:
             e.append(f"G4 findings.json: candidate {cid} is neither confirmed, rejected nor merged")
+    # Missing guards against one machine are one finding (SKILL.md F4 4c).
+    model = ctx.load("model.json") or {}
+    machine_of = {}
+    for machine in model.get("machines") or []:
+        for tr in (machine.get("transitions") or []) if isinstance(machine, dict) else []:
+            if isinstance(tr, dict):
+                machine_of[tr.get("id")] = machine.get("id")
+    cand_refs = {c.get("id"): c.get("refs") or [] for c in (ctx.load("checks.json") or {}).get("candidates") or []
+                 if isinstance(c, dict)}
+    merged_into = {}
+    for merged in data.get("merged") or []:
+        if isinstance(merged, dict):
+            merged_into.setdefault(merged.get("into"), []).append(merged.get("candidate"))
+    by_machine = {}
+    for i, finding in enumerate(data.get("confirmed") or []):
+        if not isinstance(finding, dict) or finding.get("check") != 3:
+            continue
+        owned = [finding.get("candidate")] + merged_into.get(finding.get("fingerprint"), [])
+        machines = {machine_of.get(ref) for cid in owned for ref in cand_refs.get(cid, [])} - {None}
+        for mid in machines:
+            by_machine.setdefault(mid, []).append((i, finding))
+    for mid, group in sorted(by_machine.items()):
+        if len(group) > 1:
+            unjustified = [i for i, f in group if not substantive(f.get("separate_because"))]
+            if len(unjustified) > 1:
+                e.append(f"G4 findings.json.confirmed{unjustified}: check-3 findings on machine {mid} are one "
+                         f"finding unless each later one states separate_because")
     need_log(ctx, "G4", e)
     return e
 
@@ -1106,6 +1133,15 @@ def run_all(ctx):
                          for later in log[i + 1:])
             if not redone:
                 errors.append(f"ALL run.json.log[{i}]: returned to {target}, but no later gate_passed shows it was redone")
+    for entry in log:
+        if not (isinstance(entry, dict) and entry.get("event") == "returned_to" and status == "complete"):
+            continue
+        gate = GATE_OF_PHASE.get(entry.get("phase"))
+        name = "work.md" if ctx.profile == "quick" else LOG_NAMES.get(gate or "")
+        path = ctx.run_dir / name if name else None
+        if path is not None and path.is_file() and "returned_to" not in path.read_text(encoding="utf-8"):
+            errors.append(f"ALL {name}: the redone {entry.get('phase')} log records the return "
+                          f"with a 'returned_to: <reason>' line")
     if status == "incomplete" and phase == FINAL_PHASE:
         errors.append(f"ALL run.json: an incomplete run keeps phase at the phase whose gate failed, not {FINAL_PHASE}")
     if status == "incomplete":

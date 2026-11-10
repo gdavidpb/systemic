@@ -1,0 +1,621 @@
+{
+  "systems": [
+    {
+      "id": "S-1",
+      "name": "Orders",
+      "objective": "Take an order from draft to delivered, collecting its payment on the way",
+      "elements": [
+        "E-1",
+        "E-2",
+        "E-3"
+      ],
+      "operators": [
+        "O-1",
+        "O-2",
+        "O-3",
+        "O-4",
+        "O-5",
+        "O-6",
+        "O-7",
+        "O-8",
+        "O-9",
+        "O-10"
+      ]
+    }
+  ],
+  "elements": [
+    {
+      "id": "E-1",
+      "name": "Order",
+      "representation": "status string plus items, payments, stored total and total_paid",
+      "evidence": [
+        {
+          "file": "models.py",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "id": "E-2",
+      "name": "Item",
+      "representation": "sku, qty, price",
+      "evidence": [
+        {
+          "file": "models.py",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "id": "E-3",
+      "name": "Payment",
+      "representation": "amount and provider event id",
+      "evidence": [
+        {
+          "file": "models.py",
+          "line": 28
+        }
+      ]
+    }
+  ],
+  "operators": [
+    {
+      "id": "O-1",
+      "name": "add_item",
+      "acts_on": [
+        "E-1"
+      ],
+      "result": "mutates the order in place",
+      "preconditions": "none checked",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "id": "O-2",
+      "name": "apply_discount",
+      "acts_on": [
+        "E-1"
+      ],
+      "result": "mutates the order in place",
+      "preconditions": "none checked",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "id": "O-3",
+      "name": "checkout",
+      "acts_on": [
+        "E-1"
+      ],
+      "result": "mutates the order in place",
+      "preconditions": "none checked",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 20
+        }
+      ]
+    },
+    {
+      "id": "O-4",
+      "name": "mark_paid",
+      "acts_on": [
+        "E-1"
+      ],
+      "result": "mutates the order in place",
+      "preconditions": "none checked",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 25
+        }
+      ]
+    },
+    {
+      "id": "O-5",
+      "name": "cancel",
+      "acts_on": [
+        "E-1"
+      ],
+      "result": "mutates the order in place",
+      "preconditions": "none checked",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 30
+        }
+      ]
+    },
+    {
+      "id": "O-6",
+      "name": "hold",
+      "acts_on": [
+        "E-1"
+      ],
+      "result": "mutates the order in place",
+      "preconditions": "none checked",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "id": "O-7",
+      "name": "refund",
+      "acts_on": [
+        "E-1"
+      ],
+      "result": "mutates the order in place",
+      "preconditions": "none checked",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 39
+        }
+      ]
+    },
+    {
+      "id": "O-8",
+      "name": "ship",
+      "acts_on": [
+        "E-1"
+      ],
+      "result": "mutates the order in place",
+      "preconditions": "none checked",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 43
+        }
+      ]
+    },
+    {
+      "id": "O-9",
+      "name": "deliver",
+      "acts_on": [
+        "E-1"
+      ],
+      "result": "mutates the order in place",
+      "preconditions": "status must be shipped",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 51
+        }
+      ]
+    },
+    {
+      "id": "O-10",
+      "name": "handle_payment_webhook",
+      "acts_on": [
+        "E-1",
+        "E-3"
+      ],
+      "result": "records a payment and may mark the order paid",
+      "preconditions": "none checked",
+      "evidence": [
+        {
+          "file": "webhook.py",
+          "line": 7
+        }
+      ]
+    }
+  ],
+  "machines": [
+    {
+      "id": "M-1",
+      "name": "Order status",
+      "kind": "explicit",
+      "element": "E-1",
+      "fields": [
+        "status"
+      ],
+      "declared_states": [
+        "draft",
+        "pending_payment",
+        "in_review",
+        "paid",
+        "shipped",
+        "delivered",
+        "canceled",
+        "on_hold"
+      ],
+      "declared_in": {
+        "file": "models.py",
+        "line": 6,
+        "quote": "STATUS = {"
+      },
+      "states": [
+        "draft",
+        "pending_payment",
+        "in_review",
+        "paid",
+        "shipped",
+        "delivered",
+        "canceled",
+        "on_hold",
+        "refund_pending"
+      ],
+      "initial": "draft",
+      "terminal": [
+        "delivered",
+        "canceled"
+      ],
+      "transitions": [
+        {
+          "id": "T-1",
+          "from": "*",
+          "to": "pending_payment",
+          "operator": "O-3",
+          "evidence": [
+            {
+              "file": "operations.py",
+              "line": 22,
+              "quote": "order.status = \"pending_payment\""
+            }
+          ]
+        },
+        {
+          "id": "T-2",
+          "from": "*",
+          "to": "paid",
+          "operator": "O-4",
+          "evidence": [
+            {
+              "file": "operations.py",
+              "line": 27,
+              "quote": "order.status = \"paid\""
+            }
+          ]
+        },
+        {
+          "id": "T-3",
+          "from": "*",
+          "to": "canceled",
+          "operator": "O-5",
+          "evidence": [
+            {
+              "file": "operations.py",
+              "line": 31,
+              "quote": "order.status = \"canceled\""
+            }
+          ]
+        },
+        {
+          "id": "T-4",
+          "from": "*",
+          "to": "on_hold",
+          "operator": "O-6",
+          "evidence": [
+            {
+              "file": "operations.py",
+              "line": 36,
+              "quote": "order.status = \"on_hold\""
+            }
+          ]
+        },
+        {
+          "id": "T-5",
+          "from": "*",
+          "to": "refund_pending",
+          "operator": "O-7",
+          "evidence": [
+            {
+              "file": "operations.py",
+              "line": 40,
+              "quote": "order.status = \"refund_pending\""
+            }
+          ]
+        },
+        {
+          "id": "T-6",
+          "from": "*",
+          "to": "shipped",
+          "operator": "O-8",
+          "evidence": [
+            {
+              "file": "operations.py",
+              "line": 48,
+              "quote": "order.status = \"shipped\""
+            }
+          ]
+        },
+        {
+          "id": "T-7",
+          "from": "shipped",
+          "to": "delivered",
+          "operator": "O-9",
+          "evidence": [
+            {
+              "file": "operations.py",
+              "line": 54,
+              "quote": "order.status = \"delivered\""
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "V-1",
+      "claims": [],
+      "description": "refund writes refund_pending, a value absent from the declared STATUS set",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 40,
+          "quote": "order.status = \"refund_pending\""
+        }
+      ]
+    },
+    {
+      "id": "V-2",
+      "claims": [
+        "D-1",
+        "D-4"
+      ],
+      "description": "No operator writes in_review; mark_paid moves any order straight to paid",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 27,
+          "quote": "order.status = \"paid\""
+        }
+      ]
+    },
+    {
+      "id": "V-3",
+      "claims": [
+        "D-2"
+      ],
+      "description": "cancel writes canceled from any state, including shipped",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 31,
+          "quote": "order.status = \"canceled\""
+        }
+      ]
+    },
+    {
+      "id": "V-4",
+      "claims": [
+        "D-3"
+      ],
+      "description": "hold records held_from but no operator resumes from on_hold",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 35,
+          "quote": "order.held_from = order.status"
+        }
+      ]
+    },
+    {
+      "id": "V-5",
+      "claims": [
+        "D-5",
+        "D-8"
+      ],
+      "description": "apply_discount mutates the stored total and reads values <= 1 as fractions",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 14,
+          "quote": "if value <= 1:"
+        }
+      ]
+    },
+    {
+      "id": "V-6",
+      "claims": [
+        "D-6"
+      ],
+      "description": "The webhook appends payments and adds amounts with no event-id deduplication",
+      "evidence": [
+        {
+          "file": "webhook.py",
+          "line": 10,
+          "quote": "order.total_paid = order.total_paid + event[\"amount\"]"
+        }
+      ]
+    },
+    {
+      "id": "V-7",
+      "claims": [
+        "D-9"
+      ],
+      "description": "ship reserves inventory before notifying the courier with no transaction or compensation",
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 45,
+          "quote": "# TODO: wrap in a transaction"
+        }
+      ]
+    }
+  ],
+  "claims_satisfied": [
+    "D-7"
+  ],
+  "invariants": [
+    {
+      "id": "I-1",
+      "category": "state",
+      "statement": "Every status an operator writes belongs to the declared STATUS set",
+      "machine": "M-1",
+      "operators": [
+        "O-3",
+        "O-4",
+        "O-5",
+        "O-6",
+        "O-7",
+        "O-8",
+        "O-9"
+      ],
+      "source": "inferred",
+      "claims": [],
+      "evidence": [
+        {
+          "file": "models.py",
+          "line": 6,
+          "quote": "STATUS = {"
+        }
+      ]
+    },
+    {
+      "id": "I-2",
+      "category": "transition",
+      "statement": "A shipped order is never canceled",
+      "machine": "M-1",
+      "operators": [
+        "O-5"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-2"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 11,
+          "quote": "A shipped order can"
+        }
+      ]
+    },
+    {
+      "id": "I-3",
+      "category": "transition",
+      "statement": "Only a shipped order can be delivered",
+      "machine": "M-1",
+      "operators": [
+        "O-9"
+      ],
+      "source": "inferred",
+      "claims": [],
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 52,
+          "quote": "if order.status != \"shipped\":"
+        }
+      ]
+    },
+    {
+      "id": "I-4",
+      "category": "logical",
+      "statement": "The stored total always equals the sum of the items",
+      "machine": null,
+      "operators": [
+        "O-1",
+        "O-2",
+        "O-3"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-5"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 20,
+          "quote": "The order total is ALWAYS the sum of its items"
+        }
+      ]
+    },
+    {
+      "id": "I-5",
+      "category": "temporal",
+      "statement": "Once delivered or canceled, no operator moves the order to another status",
+      "machine": "M-1",
+      "operators": [
+        "O-3",
+        "O-4",
+        "O-5",
+        "O-6",
+        "O-7",
+        "O-8"
+      ],
+      "source": "inferred",
+      "claims": [],
+      "evidence": [
+        {
+          "file": "models.py",
+          "line": 17,
+          "quote": "FINAL_STATUSES = {\"delivered\", \"canceled\"}"
+        }
+      ]
+    },
+    {
+      "id": "I-6",
+      "category": "repetition",
+      "statement": "Redelivering the same payment event leaves total_paid and payments unchanged",
+      "machine": null,
+      "operators": [
+        "O-10"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-6"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 21,
+          "quote": "Payment-provider webhooks **may arrive duplicated**"
+        }
+      ]
+    },
+    {
+      "id": "I-7",
+      "category": "atomicity",
+      "statement": "Shipping either reserves inventory and notifies the courier, or does neither",
+      "machine": null,
+      "operators": [
+        "O-8"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-9"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 25,
+          "quote": "Shipping reserves inventory and notifies the courier atomically"
+        }
+      ]
+    },
+    {
+      "id": "I-8",
+      "category": "algebraic",
+      "statement": "Resuming a held order restores the status it was held from: resume after hold is the identity on status",
+      "machine": "M-1",
+      "operators": [
+        "O-6"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-3"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 13,
+          "quote": "every paused order must"
+        }
+      ]
+    }
+  ]
+}

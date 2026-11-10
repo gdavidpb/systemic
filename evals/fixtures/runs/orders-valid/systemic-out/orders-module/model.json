@@ -448,5 +448,174 @@
   ],
   "claims_satisfied": [
     "D-7"
+  ],
+  "invariants": [
+    {
+      "id": "I-1",
+      "category": "state",
+      "statement": "Every status an operator writes belongs to the declared STATUS set",
+      "machine": "M-1",
+      "operators": [
+        "O-3",
+        "O-4",
+        "O-5",
+        "O-6",
+        "O-7",
+        "O-8",
+        "O-9"
+      ],
+      "source": "inferred",
+      "claims": [],
+      "evidence": [
+        {
+          "file": "models.py",
+          "line": 6,
+          "quote": "STATUS = {"
+        }
+      ]
+    },
+    {
+      "id": "I-2",
+      "category": "transition",
+      "statement": "A shipped order is never canceled",
+      "machine": "M-1",
+      "operators": [
+        "O-5"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-2"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 11,
+          "quote": "A shipped order can"
+        }
+      ]
+    },
+    {
+      "id": "I-3",
+      "category": "transition",
+      "statement": "Only a shipped order can be delivered",
+      "machine": "M-1",
+      "operators": [
+        "O-9"
+      ],
+      "source": "inferred",
+      "claims": [],
+      "evidence": [
+        {
+          "file": "operations.py",
+          "line": 52,
+          "quote": "if order.status != \"shipped\":"
+        }
+      ]
+    },
+    {
+      "id": "I-4",
+      "category": "logical",
+      "statement": "The stored total always equals the sum of the items",
+      "machine": null,
+      "operators": [
+        "O-1",
+        "O-2",
+        "O-3"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-5"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 20,
+          "quote": "The order total is ALWAYS the sum of its items"
+        }
+      ]
+    },
+    {
+      "id": "I-5",
+      "category": "temporal",
+      "statement": "Once delivered or canceled, no operator moves the order to another status",
+      "machine": "M-1",
+      "operators": [
+        "O-3",
+        "O-4",
+        "O-5",
+        "O-6",
+        "O-7",
+        "O-8"
+      ],
+      "source": "inferred",
+      "claims": [],
+      "evidence": [
+        {
+          "file": "models.py",
+          "line": 17,
+          "quote": "FINAL_STATUSES = {\"delivered\", \"canceled\"}"
+        }
+      ]
+    },
+    {
+      "id": "I-6",
+      "category": "repetition",
+      "statement": "Redelivering the same payment event leaves total_paid and payments unchanged",
+      "machine": null,
+      "operators": [
+        "O-10"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-6"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 21,
+          "quote": "Payment-provider webhooks **may arrive duplicated**"
+        }
+      ]
+    },
+    {
+      "id": "I-7",
+      "category": "atomicity",
+      "statement": "Shipping either reserves inventory and notifies the courier, or does neither",
+      "machine": null,
+      "operators": [
+        "O-8"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-9"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 25,
+          "quote": "Shipping reserves inventory and notifies the courier atomically"
+        }
+      ]
+    },
+    {
+      "id": "I-8",
+      "category": "algebraic",
+      "statement": "Resuming a held order restores the status it was held from: resume after hold is the identity on status",
+      "machine": "M-1",
+      "operators": [
+        "O-6"
+      ],
+      "source": "declared",
+      "claims": [
+        "D-3"
+      ],
+      "evidence": [
+        {
+          "file": "README.md",
+          "line": 13,
+          "quote": "every paused order must"
+        }
+      ]
+    }
   ]
 }

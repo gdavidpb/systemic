@@ -7,9 +7,11 @@ lifecycles, workflows, sagas, anything with a `status` column — the way
 General Systems Theory audits a system.**
 
 It models your code or design as a system of elements, operators and state
-machines, checks twelve consistency properties, and writes a Markdown report
-on your disk. Every finding cites the line it rests on, has survived an
-attempt to refute it, and is checked by a validator before you read it.
+machines, checks twelve consistency properties, then reads your tests and
+tells you which of the system's invariants they actually protect. It writes
+a Markdown report on your disk. Every finding cites the line it rests on, has
+survived an attempt to refute it, and is checked by a validator before you
+read it.
 
 ```
 /systemic analyze the order lifecycle in src/orders
@@ -81,22 +83,27 @@ intent, not the keyword:
 Is this design consistent? docs/rental-design.md
 ```
 ```
+Our suite is green. Do our tests really protect the order lifecycle?
+```
+```
 Find contradictions between what the README promises and what the code does.
 ```
 ```
 Review my state machine — I think there are transitions nobody handles.
 ```
 
-Point it at a path, a design document, or both. When the run finishes you get,
-in the chat, the path of the report, a short summary and the most serious
-finding. The full report is at `systemic-out/<scope>.md` in your project.
+Point it at a path, a design document, or both. If the module has tests, it
+finds them and audits them too; you do not need to list them. When the run
+finishes you get,
+in the chat, the path of the report, a short summary, the most serious
+finding and the most serious gap in your tests. The full report is at `systemic-out/<scope>.md` in your project.
 
 If you point it at a large repository with no focus, it proposes the
 subsystem with the most state and waits for your answer before it starts.
 
 ## How a run works
 
-A run goes through eight phases. Each phase writes its results to disk, and
+A run goes through nine phases. Each phase writes its results to disk, and
 a validator checks them before the next phase starts. Nothing the report says
 can come from a step that was skipped.
 
@@ -109,23 +116,25 @@ flowchart TD
   F1 --> G1{"gate"} --> F2["F2 Model: systems, operators, state machines"]
   F2 --> G2{"gate"} --> F3["F3 Verify: twelve checks, candidate findings"]
   F3 --> G3{"gate"} --> F4["F4 Audit: re-read, refute, deduplicate, rate"]
-  F4 --> G4{"gate"} --> PR{"Previous report?"}
-  PR -- "yes" --> F5["F5 Reconcile with the previous report"] --> G5{"gate"} --> F6
-  PR -- "no" --> F6["F6 Report"]
-  F6 --> G6{"gate"} --> F7(["F7 Done: path, summary, top finding"])
+  F4 --> G4{"gate"} --> F5["F5 Test audit: which invariants your tests protect"]
+  F5 --> G5{"gate"} --> PR{"Previous report?"}
+  PR -- "yes" --> F6["F6 Reconcile with the previous report"] --> G6{"gate"} --> F7
+  PR -- "no" --> F7["F7 Report"]
+  F7 --> G7{"gate"} --> F8(["F8 Done: path, summary, top finding"])
   G4 -. "still failing after two fixes" .-> INC(["Incomplete: the report says why"])
 ```
 
 | Phase | What it does | What it writes | What blocks it |
 |---|---|---|---|
 | F0 Scope | Settles what is analyzed, the output mode, the language and where the report goes | `run.json` | A large scope with no focus |
-| F1 Silhouette | Reads every file in scope and lists what the docs, docstrings and constants promise | `sources.json` | A file in scope that was neither read nor excluded with a reason |
-| F2 Model | Describes the systems, operators and state machines the code actually builds | `model.json` | A transition no operator performs; a declared state missing from the model |
+| F1 Silhouette | Reads every file in scope, tests included, and lists what the docs, docstrings and constants promise | `sources.json` | A file in scope that was neither read nor excluded with a reason |
+| F2 Model | Describes the systems, operators and state machines the code actually builds, and catalogs the invariants they must keep | `model.json` | A transition no operator performs; a declared state missing from the model; a machine with no invariant |
 | F3 Verify | Runs the twelve checks; every suspected defect becomes a candidate | `checks.json` | Fewer than twelve verdicts; "clean" without evidence |
 | F4 Audit | Re-reads each candidate's evidence, tries to refute it, merges duplicates, rates severity | `findings.json` | A quote that is not at the cited line; a candidate left unresolved |
-| F5 Reconcile | On a second run, classifies every earlier finding | `reaudit.json` | An earlier finding left unclassified; "resolved" without proof of the fix |
-| F6 Report | Writes the report from the records | `systemic-out/<scope>.md` | Counts or severities that differ from the records |
-| F7 Done | Confirms the run and replies in chat | — | — |
+| F5 Test audit | Reads your tests and decides, invariant by invariant, whether an assertion would catch a violation | `tests.json` | A coverage claim without the assertion that proves it; an idempotency rule "covered" by a single call |
+| F6 Reconcile | On a second run, classifies every earlier finding | `reaudit.json` | An earlier finding left unclassified; "resolved" without proof of the fix |
+| F7 Report | Writes the report from the records | `systemic-out/<scope>.md` | Counts or severities that differ from the records |
+| F8 Done | Confirms the run and replies in chat | — | — |
 
 **Why you can trust the result.** Every finding has to pass three tests
 before it reaches you. Its quoted evidence must still be at the cited line
@@ -148,6 +157,7 @@ your-project/
         ├── model.json        systems, operators, state machines
         ├── checks.json       twelve verdicts and candidate findings
         ├── findings.json     confirmed, rejected and merged candidates
+        ├── tests.json        what your tests assert, invariant by invariant
         ├── reaudit.json      only on a second run
         └── *.md / work.md    the reasoning log of each phase
 ```
@@ -188,10 +198,68 @@ Every check gets a verdict on every run: **findings**, **clean** (with what
 was verified) or **not verifiable** (with what was missing). Missing material
 is never reported as clean.
 
+## Do your tests protect your invariants?
+
+A green suite tells you that its assertions hold. It does not tell you which
+of your system's rules those assertions defend. Line coverage does not
+either: a test that calls `refund()` and checks nothing about the status
+covers every line of `refund()` and protects nothing.
+
+So after auditing the code, `systemic` audits your tests against the same
+model. It writes down the invariants your lifecycle must keep — the ones your
+README declares and the ones the model implies — and for each one it looks
+for the assertion that would fail if the invariant broke. It reads the tests;
+it never runs them.
+
+Invariants come in eight kinds, and each kind can only be caught by a certain
+kind of test:
+
+| Category | The rule it states | Example | A test that can catch a violation |
+|---|---|---|---|
+| `state` | Every state written is valid | `status` is always one of the declared values | Any test that checks the state after the operation |
+| `transition` | Only allowed transitions happen | A shipped order can never be canceled | One test per allowed move, one per refusal |
+| `logical` | Business values stay consistent | The total is always the sum of the items | Any test that checks the relation |
+| `temporal` | What must (never) happen over time | Never shipped before paid; a closed ticket never reopens | Tests that run a sequence of operations |
+| `repetition` | Doing it twice equals doing it once | A redelivered webhook does not charge twice | Tests that repeat the call or the event |
+| `concurrency` | Simultaneous operations do not clobber each other | Two payments at once do not lose an update | Tests that force an interleaving |
+| `atomicity` | All or nothing | If the courier fails, the stock reservation is undone | Tests that make a dependency fail midway |
+| `algebraic` | Operations that undo or mirror each other | Resuming a paused order restores its previous state | Tests that compose operations and compare results |
+
+Each invariant ends with one coverage level:
+
+| Level | Means |
+|---|---|
+| `asserted` | A test asserts it, with a technique that can catch a violation. The report cites the assertion. |
+| `weak` | Tests run that code, but nothing would fail on a violation: the happy path of a guard, a webhook delivered once, a shipping test where nothing ever fails. |
+| `contradicted` | A test asserts the opposite. It passes *because of* the defect, and fixing the bug will turn it red. |
+| `uncovered` | No test touches it. The report says what was searched. |
+| `not verifiable` | The tests were outside the scope you gave. |
+
+The report summarizes this in one table per run:
+
+```markdown
+| Category | Invariants | asserted | weak | contradicted | uncovered | not verifiable |
+|---|---|---|---|---|---|---|
+| state | 1 | 0 | 0 | 1 | 0 | 0 |
+| transition | 2 | 1 | 1 | 0 | 0 | 0 |
+| repetition | 1 | 0 | 1 | 0 | 0 | 0 |
+| atomicity | 1 | 0 | 1 | 0 | 0 | 0 |
+| …
+```
+
+It also tells you, for every finding, whether your suite would **detect**
+it, leaves it **undetected**, or **enshrines** it — asserts the buggy
+behavior as correct. Enshrined findings come first: they are the ones where
+fixing the code breaks your build. These gaps are reported in their own
+section; they never add findings or change severities. If the scope has no
+tests, the report says so and every invariant reads as uncovered. If you ask
+it to leave the tests out, it does not open them, and the report says
+coverage was not assessed rather than claiming anything is untested.
+
 ## Output modes
 
 **`functional` is the default; `full` adds the systemic detail.** Both run
-the same eight phases on the same evidence. Only the report differs.
+the same nine phases on the same evidence. Only the report differs.
 
 | Content | `functional` (default) | `full` |
 |---|---|---|
@@ -202,6 +270,7 @@ the same eight phases on the same evidence. Only the report differs.
 | State diagrams and state × operator matrices | In the workspace only | In the report |
 | GST theory and the check behind each finding | Omitted | Included |
 | Twelve-check coverage | In the workspace; material limits in the report | Full verdict table |
+| Invariant coverage by tests | Category table and the gaps that matter, in plain words | Category table, every invariant, the state × operator cells your tests reach |
 
 Choose it in plain words; these are not CLI flags:
 
@@ -357,25 +426,31 @@ A complete, validated example run — report and workspace — is in
 ## Repository layout
 
 ```
-SKILL.md                      the eight phases, shared rules, labels and severity
+SKILL.md                      the nine phases, shared rules, labels and severity
 references/
   run-contracts.md            the exact shape of every file a run writes
   gst-framework.md            the conceptual vocabulary (read in F2)
   checks.md                   how to detect each of the twelve checks (read in F3)
+  invariants.md               invariant categories and test coverage (read in F2 and F5)
   output-functional.md        functional report format (default)
   output-full.md              detailed systemic report format
 scripts/
   systemic_check.py           the gate validator (Python 3.9+, standard library)
 evals/
-  evals.json                  14 forward evals with assertions
+  evals.json                  23 forward evals with assertions
+  COVERAGE.md                 which eval and test covers each behavior of the skill
   test_systemic_check.py      validator tests: one contract violation per test
   test_adversarial_fixtures.py executable counterexamples for the fixtures
-  fixtures/orders/            a code module with seeded defects
+  fixtures/orders/            a code module with seeded defects and a green suite that misses them
   fixtures/rental-doc/        a design document with seeded flaws
   fixtures/booking-saga/      a compensating saga: partial failure and loops
-  fixtures/clean-ticket/      a correct lifecycle: the false-positive control
+  fixtures/clean-ticket/      a correct lifecycle with a strong suite: the false-positive control
   fixtures/guarded-elsewhere/ defended paths plus refund/recovery defects
   fixtures/independent-ledgers/ separate causes and bounded impact
+  fixtures/stock-reservations/ an implicit machine, concurrency, a justified critical, tests with traps
+  fixtures/monorepo/          an unfocused repository with a graphify map: scope proposal
+  fixtures/collision/         an unrelated file at the default report path
+  fixtures/resume/            a run interrupted at F5 whose source changed since F1
   fixtures/rerun/             a previous Markdown-only report (legacy re-audit)
   fixtures/rerun-external/    a missing successor: unverified re-audit
   fixtures/rerun-json/        a previous run with findings.json (fingerprint re-audit)
@@ -403,9 +478,16 @@ itself tested.
 the report and workspace against written assertions. To run one: copy the
 skill to an isolated location, substitute its absolute path for `<SKILL_DIR>`
 in the prompt, run the prompt from an empty working directory, and check each
-assertion. Evals 8, 9, 13 and 14 need a previous report seeded first; the
+assertion. Evals 8, 9, 13, 14 and 20–23 need setup first (a seeded file, a copied
+run, or a machine without Python); the
 setup is described in the `notes` field of `evals.json`. Cases 1–10 and 14
-request `full`; 11–13 exercise mode selection and history across modes.
+request `full`; 11–13 exercise mode selection and history across modes; 15
+and 16 exercise the test audit; 17–20 cover concurrency, system limits,
+a justified critical, scope proposals, graphify, name collisions, the
+standard profile and excluded tests; 21–23 cover resuming an interrupted
+run, checking the gates by hand without Python, and an incomplete run.
+[`evals/COVERAGE.md`](evals/COVERAGE.md) maps every behavior of the skill to
+the evals and tests that cover it.
 
 Evals 6 and 7 matter most as the skill changes. A tool that reports problems
 is only as useful as its false-positive rate, and every other eval pushes

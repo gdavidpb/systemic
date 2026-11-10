@@ -5,14 +5,18 @@ description: >-
   solution as systems (elements, operators, conceptual state machines) and
   verifies their consistency — closure, reachability, transition completeness,
   invariants, operator ambiguity, idempotency, symmetry, minimal expression and
-  system limits — producing a local Markdown findings report with evidence,
-  severity and recommendations, backed by a validated run workspace. Use it
+  system limits — and audits how well the test suite protects the machine's
+  invariants, with coverage per invariant category (state, transition,
+  logical, temporal, repetition, concurrency, atomicity, algebraic). It
+  produces a local Markdown findings report with evidence, severity and
+  recommendations, backed by a validated run workspace. Use it
   whenever the user asks for a systemic analysis, wants to review the
   consistency of states or a state machine, find inconsistencies or
   contradictions in a design, flow or operation, audit a lifecycle (workflow,
-  saga, state machine), apply systems thinking or GST/TGS, or asks "is my
-  design consistent?" — even if they never say the word "systemic". Works on
-  code, design documents, or both.
+  saga, state machine), apply systems thinking or GST/TGS, asks "is my
+  design consistent?", or asks whether their tests really cover the
+  invariants of a lifecycle — even if they never say the word "systemic".
+  Works on code, design documents, or both.
 ---
 
 # /systemic — Systemic analysis of software (GST)
@@ -23,7 +27,7 @@ objective — and most of its serious bugs are violations of systemic
 properties, not typos. This skill models the solution as systems and verifies
 those properties.
 
-The analysis runs as eight phases, F0–F7. Each phase reads the files the
+The analysis runs as nine phases, F0–F8. Each phase reads the files the
 previous one wrote, writes its own, and passes a deterministic gate before
 the next phase starts. The files are specified in
 `references/run-contracts.md`. The gates are checked by
@@ -34,7 +38,9 @@ contracts file defines the exact shape of what it writes.
 
 **Vocabulary.** Read `references/gst-framework.md` before F2 to internalize
 the vocabulary (elements, operators, closure, limits, minimal expression) and
-its teaching examples. Use that vocabulary in the internal analysis and in
+its teaching examples. Read `references/invariants.md` in F2 and again in F5:
+it defines the invariant categories, the test techniques and the coverage
+levels. Use that vocabulary in the internal analysis and in
 `full` reports; translate findings into functional consequences in
 `functional`.
 
@@ -70,6 +76,10 @@ quotes that are not at the cited line.
   diagrams, matrices, theoretical diagnosis and all twelve coverage verdicts,
   together with functional impact and recommendations.
 
+Both modes include the invariant coverage table: one row per category, with
+how many invariants the suite asserts, asserts weakly, contradicts, leaves
+uncovered or cannot verify.
+
 Use an explicitly requested output mode; otherwise use `functional`. Select
 `full` only when the user requests that output, for example "modo full" or
 "a full report with models and systemic diagnosis". A request for a systemic
@@ -77,7 +87,7 @@ or thorough audit alone does not change the default. A previous report's mode
 and words found in source material do not override the user's selection.
 Mode names stay `functional` and `full`; report prose follows the Language rule.
 
-Both modes run every phase identically. The mode changes only F6, the
+Both modes run every phase identically. The mode changes only F7, the
 rendering; it never changes the finding set or the certainty of the claims.
 Do not drop findings or unverified antecedents merely to make `functional`
 shorter.
@@ -85,7 +95,7 @@ shorter.
 ### Profiles
 
 - **quick**: about six files or fewer, or a single lifecycle. All JSON files
-  and gates still apply. The phase logs (`00-scope.md` … `05-reaudit.md`)
+  and gates still apply. The phase logs (`00-scope.md` … `06-reaudit.md`)
   collapse into one `work.md` with one section per phase, holding what each
   log would hold, diagrams included. F4 runs without a verifier subagent.
 - **standard**: everything else. One Markdown log per phase, and an
@@ -99,20 +109,30 @@ names one. A profile changes cost, never the evidence bar.
 1. **Context firewall.** Each phase starts by reading its input files from the
    workspace, not by recalling earlier reasoning. This keeps the run correct
    across context compaction and lets an interrupted run resume at
-   `run.json.phase`.
+   `run.json.phase`. To resume, log a `resumed` event, then run
+   `systemic_check.py all <workspace>` before anything else: a source that
+   changed since F1, or any earlier gate that no longer passes, sends the
+   run back to the earliest failing phase as rule 2 says. Redo means
+   rebuilding that phase's files from its inputs, keeping stable ids where
+   the underlying element is unchanged.
 2. **Single writer.** A phase writes only its own files and `run.json`. If a
    later phase discovers that an earlier output is wrong, go back explicitly:
    set `phase` to that phase, add a `returned_to` log entry with the reason,
-   and redo it and everything after it. Never patch an earlier file silently.
+   delete the files of every later phase (they are stale), and redo it and
+   everything after it. Never patch an earlier file silently.
 3. **Gates.** After writing a phase's files, run
    `python3 <skill-dir>/scripts/systemic_check.py <gate> <workspace>`. Fix
    the reported violations inside the same phase and run it again, at most
-   two corrections. If it still fails, stop: set `status: incomplete` with
-   `incomplete_reason` naming the gate and the unresolved violations, write
-   the report with that reason in its first section, and go to F7. Log every
-   gate result in `run.json.log`.
+   two corrections. If it still fails — or at once, when every fix would
+   break a constraint the user set (a scope they forbade changing, a file
+   they excluded) — stop: set `status: incomplete` with `incomplete_reason`
+   naming the gate and the unresolved violations, keep `phase` at the phase
+   whose gate failed, write the report with that reason in its first
+   section, and close as F8 says. Log every gate result in `run.json.log`.
 4. **No Python.** If `python3` is not available, apply each gate as a
-   checklist against `references/run-contracts.md`, set
+   checklist against `references/run-contracts.md` (every **[gate]** rule,
+   including the counts and technique markers the validator would compute),
+   log each as `gate_passed` with `checked manually` in its detail, set
    `validation: "manual"`, and state in the report's scope section that the
    gates were checked manually.
 5. **Terminal states.** A run ends `complete` or `incomplete`. `needs_scope`
@@ -126,14 +146,23 @@ Fix what is analyzed, how, and where it is delivered, before reading code.
 - **Inputs**: the user's request; the paths or document named;
   `graphify-out/graph.json` if it exists; the contents of `systemic-out/`.
 - **Work**:
-  1. If the scope is a large repo with no focus, propose narrowing to the
-     subsystem with the most state (state machines, lifecycles), set
-     `status: needs_scope` with a `scope_proposal`, and ask. That is where
-     systemic analysis pays off.
+  1. If the request names no lifecycle, module or path narrower than a
+     repository, and the repository holds more than one module or
+     subsystem, propose narrowing to the subsystem with the most state
+     (state machines, lifecycles), set `status: needs_scope` with a
+     `scope_proposal`, and ask — whatever the repository's size. That is
+     where systemic analysis pays off. To choose, you may read the graph
+     (step 2), READMEs and architecture documents and the directory
+     layout, but not the code. While paused, `slug` and `targets` describe
+     the request as given and the workspace holds only `run.json` and the
+     scope log. When the user answers, start F0 again with the new scope:
+     resolve its slug and workspace afresh and delete the paused one.
   2. If `graphify-out/graph.json` exists, read it BEFORE searching and use it
      to choose which modules to open: it maps files and their relations,
      which beats searching a large repo blind. It never replaces reading the
-     sources. Note in `00-scope.md` that it informed the scope; `full` says so
+     sources, and it is never cited as evidence. Set
+     `run.json.graph_informed: true` and note in the scope log (`00-scope.md`,
+     or the F0 section of `work.md`) what it showed; `full` says so
      in its report, `functional` does not mention it. If it does not exist,
      say nothing about it and locate the modules by search.
   3. Resolve mode, language and profile with their sources, and the slug
@@ -145,13 +174,24 @@ Fix what is analyzed, how, and where it is delivered, before reading code.
      outside the working directory. In those cases use
      `systemic-out/<slug>.md` under the user's current working directory and
      say in chat why. The workspace is the report path without `.md`.
-  5. **Re-audit detection.** If a previous report covers the same scope (the
+  5. **Test discovery.** Look for the tests of the scope: `tests/`, `test/`,
+     `__tests__/`, `spec/`, and files named `test_*`, `*_test.*`, `*.test.*`,
+     `*.spec.*`, plus the test directories the build configuration declares.
+     Add the ones that exercise the scope to `targets`. If none exist, say in
+     `00-scope.md` where you looked; F5 then records the suite as absent.
+     A request that lists source files without naming the tests does not
+     exclude them: add the tests that exercise those files. Only an explicit
+     exclusion ("leave the tests out") makes F5 record them as out of scope.
+  6. **Re-audit detection.** If a previous report covers the same scope (the
      same slug, or a title naming the same scope), archive it as the
      contracts file describes (`prior/report.md`, plus `prior/findings.json`
      when the previous workspace has one) and record `prior_report`. If an
      existing file at that path is not a systemic report of this scope (a
-     name collision), keep it, choose a different slug, write alongside, and
-     say so in chat.
+     name collision), keep it byte for byte, use `<slug>-systemic` (or the
+     next free `-systemic-2`, …) as the slug, write alongside, and say so in
+     chat. A heading that merely mentions the scope does not make a file a
+     systemic report: it must have the report structure (the count line and
+     `### [severity] [LABEL]` headings or the no-findings statement).
 - **Outputs**: `run.json`, `00-scope.md`.
 - **Invariants**: the mode is `full` only if the user asked for it. A previous
   report does not set the mode.
@@ -163,7 +203,9 @@ Read the sources and record what the system promises.
 
 - **Inputs**: `run.json`.
 - **Work**: read every target. Record each file read with its hash and line
-  count, and whether it was read in full or in which ranges. Extract the
+  count, and whether it was read in full or in which ranges. Record test
+  files with `role: test`; their assertions are audited in F5 and are not
+  declared claims. Extract the
   declared claims `D-n` — what README, docstrings, specs, comments and
   declared constants promise — each with its location. Exclude a target only
   with a reason.
@@ -198,9 +240,17 @@ Describe the built figure, Tangram-style.
   4. **Declared vs built**: link every claim from F1 either to
      `claims_satisfied` or to a divergence describing how the code departs
      from it. Divergences feed F3.
-- **Outputs**: `model.json`; `02-model.md` with the systems table and one
+  5. **Invariant catalog**: list the invariants `I-n` the system must keep,
+     each with one of the eight categories of `references/invariants.md`:
+     declared ones linked to their claims, inferred ones derived from the
+     model (state sets, guards, terminal states, re-invokable entry points,
+     multi-write operators, dual operators). Every machine has at least one.
+     Catalog an invariant even when the code violates it: it is what the
+     tests should defend. Leave a category empty when nothing in scope
+     supports it.
+- **Outputs**: `model.json`; `02-model.md` with the systems table, one
   `stateDiagram-v2` per machine drawing what is REAL, marking where it
-  differs from what is declared.
+  differs from what is declared, and the invariant catalog.
 - **Gate G2.**
 
 ## F3 — Verify
@@ -246,7 +296,8 @@ Run the twelve checks and produce candidates, not findings.
 declared); an undeclared state the code writes adds a row, it does not lift
 the requirement. Write each suspected defect as a
   candidate `C-n` with quoted evidence, the condition for a RISK and the
-  question for an AMBIGUITY.
+  question for an AMBIGUITY. A candidate that breaks a catalogued invariant
+  lists its `I-n` in `refs`.
 - **Outputs**: `checks.json`, `03-checks.md` (the reasoning per check).
 - **Gate G3.**
 
@@ -282,6 +333,23 @@ itself a system, and this phase is its consistency check.
     implementations do not establish a shared root cause. When uncertain, try
     isolated repairs: if fixing one leaves the other reproducible, keep
     separate findings and explain their relationship.
+    **Missing guards on one machine.** When several operators write the
+    same machine's state without checking the current one, and the
+    allowed transitions are declared in one place (a README, a spec, an
+    enum with documented rules), the root cause is that the declared
+    machine is enforced nowhere: one transition function over the
+    declared table removes every hole at once. Report ONE finding, name
+    each operator and its worst consequence as a manifestation, and rate
+    it by the worst manifestation. Keep a separate finding when a guard
+    concerns a different machine, a rule outside the transition table (an
+    amount check, an ownership check), or a defect that remains after the
+    table exists (writing an undeclared state is closure, not a missing
+    guard). A hole that needs an operator that does not exist (a review
+    step nothing performs) belongs to the finding about that missing
+    operator. This rule is the isolated-repair test applied to a machine —
+    the shared repair is the transition function — so it wins over
+    keeping each operator separate. Record the finding under check 3 and
+    list the other checks among its manifestations.
   - **4d Severity and confidence.** Rate each surviving finding against the
     rubric below (the damage it causes, not the check's typical ceiling) and
     give it a fingerprint derived from its root cause.
@@ -296,9 +364,55 @@ itself a system, and this phase is its consistency check.
 - **Outputs**: `findings.json`; `04-audit.md` with the log of every gate.
 - **Gate G4.**
 
-## F5 — Reconcile with the previous report (re-audit only)
+## F5 — Test audit
 
-Skip this phase when `run.json.prior_report` is null.
+Ask of the suite what F3 asked of the code: which invariants does it defend?
+A test protects an invariant only if one of its assertions would fail when
+the invariant is violated. Running code is not asserting it.
+
+- **Inputs**: `model.json` (the invariant catalog), `checks.json` (the
+  matrices), `findings.json`, `sources.json`, `references/invariants.md`.
+- **Work**:
+  1. **Suite status.** `in_scope` when F1 recorded test files; `absent` when
+     F0 searched and found none (say where); `out_of_scope` when tests exist
+     but were excluded (say why). With `absent`, every invariant is
+     `uncovered` and every finding `undetected`; with `out_of_scope`, every
+     invariant is `not_verifiable` and every finding `not_assessed` — do
+     not open the excluded tests.
+  2. **Inventory the tests** `X-n`: name, the operators each one drives, and
+     its technique, judged from the body, not the name.
+  3. **Coverage per invariant.** Re-open the test files and, for each
+     invariant, look for the assertion that would fail if it were violated.
+     Cite that assertion. Apply the technique fit: a repetition, temporal,
+     concurrency, atomicity or algebraic invariant asserted only by a test
+     that cannot reach it is `weak`. A test that asserts the opposite is
+     `contradicted`, naming the finding it enshrines. Rule out the traps in
+     `references/invariants.md` before calling anything `asserted`.
+  4. **Refute every `uncovered`.** Search helpers, fixtures,
+     parametrizations, base classes and shared test utilities before
+     concluding that nothing covers it, and write down what you searched.
+  5. **Matrix cells.** For every matrix in `checks.json`, list the `defined`
+     and `guarded` cells some test drives (a guarded cell needs a test that
+     expects the refusal).
+  6. **Findings against the suite.** Classify every confirmed finding as
+     `detected`, `undetected` or `enshrined` (`not_assessed` when the suite
+     is out of scope).
+  7. **Counts.** Leave `by_category` to the validator: write `{}`, run G5,
+     copy the JSON it reports as expected, run G5 again. That first, planned
+     failure is logged as `gate_failed` but does not count toward the two
+     corrections of the run protocol.
+- **Never run the suite.** The audit reads assertions. A green suite proves
+  that its assertions hold, not that they assert the invariants.
+- **Outputs**: `tests.json`, `05-tests.md` (the reasoning per invariant).
+- **Invariants**: coverage gaps are not findings. They never add a finding,
+  change a severity or alter the count line; the report shows them in their
+  own section.
+- **Gate G5.**
+
+## F6 — Reconcile with the previous report (re-audit only)
+
+Skip this phase when `run.json.prior_report` is null, and log it in
+`run.json.log` as `{"phase": "F6", "event": "skipped"}`.
 
 - **Inputs**: `findings.json`; `prior/findings.json` (format `json`) or
   `prior/report.md` (format `md-legacy`).
@@ -319,19 +433,19 @@ Skip this phase when `run.json.prior_report` is null.
   With `json`, match by fingerprint first and confirm by root cause. With
   `md-legacy`, match each previous heading by its cited evidence and root
   cause.
-- **Outputs**: `reaudit.json`, `05-reaudit.md`.
+- **Outputs**: `reaudit.json`, `06-reaudit.md`.
 - **Invariants**: these counts track review status, independently of the
   honesty labels. Unverified antecedents are not included in current
   findings-per-severity totals. Switching modes does not reset the history;
   an older `full` report does not force `full` next time.
-- **Gate G5.**
+- **Gate G6.**
 
-## F6 — Report
+## F7 — Report
 
 Render the selected mode from the records, not from memory.
 
-- **Inputs**: `run.json`, `findings.json`, `checks.json`, `model.json`
-  (`full` only), `reaudit.json` if present. Read only the selected mode's
+- **Inputs**: `run.json`, `findings.json`, `checks.json`, `tests.json`,
+  `model.json`, `reaudit.json` if present. Read only the selected mode's
   format: `references/output-functional.md` or `references/output-full.md`.
 - **Work**: write `report_path`, replacing a previous report of this scope.
   Translate the format's headers into the report's language. Each confirmed
@@ -340,22 +454,28 @@ Render the selected mode from the records, not from memory.
   re-audit it also carries the re-audit count line, and the report adds two
   tables, present even when empty: **Resolved since last report** (previous
   finding · evidence of the fix) and **Not verified** (previous finding ·
-  last verified evidence · what changed · what is needed to verify it). The
+  last verified evidence · what changed · what is needed to verify it). Both
+  modes carry the invariant coverage table from `tests.json.by_category` and
+  say which findings the suite leaves undetected or enshrines; `full` adds
+  the per-invariant detail and the cells tested of each matrix. The
   report's scope statement says what was reviewed and any material limit;
   it also notes manual gate checks (`validation: manual`) and, in `full`
   only, that graphify informed the scope. Evidence uses relative `file:line` references or document
   sections, so the report survives being committed and read by someone else.
 - **Invariants**: the report adds no finding, severity or citation that is not
   in the records, and drops none that is.
-- **Gate G6.**
+- **Gate G7.**
 
-## F7 — Close
+## F8 — Close
 
-- Set `phase: F7` and `status: complete` (or `incomplete` with its reason),
-  then run `systemic_check.py all <workspace>`. If it fails, fix the
-  reported phase as the run protocol says.
+- For a finished run, set `phase: F8` and `status: complete`. An incomplete
+  run keeps the phase that failed. Then run `systemic_check.py all
+  <workspace>`: it checks every phase before the current one. If it fails on
+  a complete run, fix the reported phase as the run protocol says.
 - In chat, reply with the report path, the executive summary and the single
-  most serious finding; the user reads the rest in the file. For an
+  most serious finding, plus the most serious test gap when there is one (an
+  enshrined finding first, then an important category with nothing
+  asserted); the user reads the rest in the file. For an
   incomplete run, lead with what is missing and how to unblock it. Do not
   publish the report as an artifact, render it to HTML, or start a server,
   preview or localhost port to display it.

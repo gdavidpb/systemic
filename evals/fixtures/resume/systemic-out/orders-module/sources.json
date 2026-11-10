@@ -1,0 +1,96 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "1072f5824b072f8d929ba1d04d3e09a36b92f39f513166b42500359a37fce9f1",
+      "lines": 26,
+      "read": "full",
+      "role": "source"
+    },
+    {
+      "path": "models.py",
+      "sha256": "5e5c80d0569bae26f17ab2d0787e121dfa4b21749c640cf1dcfa9e9852038cf1",
+      "lines": 51,
+      "read": "full",
+      "role": "source"
+    },
+    {
+      "path": "operations.py",
+      "sha256": "4bb83d2e297fabccb895fd1361353cd1bc39a1abf4f7736a91aa893d4bbaaa94",
+      "lines": 54,
+      "read": "full",
+      "role": "source"
+    },
+    {
+      "path": "webhook.py",
+      "sha256": "010329b7e87d049080774f24d4d1943160a7ef959660c0a6ee424fea3898d206",
+      "lines": 12,
+      "read": "full",
+      "role": "source"
+    },
+    {
+      "path": "test_orders.py",
+      "sha256": "53e84b6842a81c8ef35d038cb243e97550c2ab5a837e49330d11bcdb84d76706",
+      "lines": 70,
+      "read": "full",
+      "role": "test"
+    }
+  ],
+  "excluded": [],
+  "claims": [
+    {
+      "id": "D-1",
+      "text": "Declared lifecycle: draft, pending_payment, in_review, paid, shipped, delivered",
+      "file": "README.md",
+      "line": 8
+    },
+    {
+      "id": "D-2",
+      "text": "canceled is reachable only from draft or pending_payment; a shipped order is never canceled",
+      "file": "README.md",
+      "line": 11
+    },
+    {
+      "id": "D-3",
+      "text": "Every paused order must be able to resume to the state it was in",
+      "file": "README.md",
+      "line": 14
+    },
+    {
+      "id": "D-4",
+      "text": "Every payment goes through the in_review anti-fraud state",
+      "file": "README.md",
+      "line": 15
+    },
+    {
+      "id": "D-5",
+      "text": "The order total is always the sum of its items",
+      "file": "README.md",
+      "line": 20
+    },
+    {
+      "id": "D-6",
+      "text": "Duplicated payment webhooks must be tolerated",
+      "file": "README.md",
+      "line": 21
+    },
+    {
+      "id": "D-7",
+      "text": "An order is marked paid only when the amount paid covers the total",
+      "file": "README.md",
+      "line": 23
+    },
+    {
+      "id": "D-8",
+      "text": "Discounts are expressed as a percentage between 0 and 100",
+      "file": "README.md",
+      "line": 24
+    },
+    {
+      "id": "D-9",
+      "text": "Shipping reserves inventory and notifies the courier atomically",
+      "file": "README.md",
+      "line": 25
+    }
+  ]
+}

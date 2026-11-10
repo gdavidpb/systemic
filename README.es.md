@@ -7,10 +7,11 @@ estado —ciclos de vida, workflows, sagas, cualquier cosa con una columna
 `status`— como la Teoría General de Sistemas audita un sistema.**
 
 Modela tu código o tu diseño como un sistema de elementos, operadores y
-máquinas de estados, verifica doce propiedades de consistencia y escribe un
-reporte en Markdown en tu disco. Cada hallazgo cita la línea en la que se
-apoya, ha sobrevivido a un intento de refutarlo y lo revisa un validador
-antes de que lo leas.
+máquinas de estados, verifica doce propiedades de consistencia y luego lee
+tus pruebas para decirte cuáles de los invariantes del sistema protegen de
+verdad. Escribe un reporte en Markdown en tu disco. Cada hallazgo cita la
+línea en la que se apoya, ha sobrevivido a un intento de refutarlo y lo
+revisa un validador antes de que lo leas.
 
 ```
 /systemic analiza el ciclo de vida de pedidos en src/orders
@@ -84,14 +85,19 @@ intención, no por la palabra clave:
 ¿Es consistente este diseño? docs/rental-design.md
 ```
 ```
+Nuestra suite está en verde. ¿De verdad protege el ciclo de vida de pedidos?
+```
+```
 Encuentra contradicciones entre lo que promete el README y lo que hace el código.
 ```
 ```
 Revisa mi máquina de estados — creo que hay transiciones que nadie maneja.
 ```
 
-Apúntala a una ruta, a un documento de diseño o a ambos. Al terminar recibes
-en el chat la ruta del reporte, un resumen breve y el hallazgo más grave. El
+Apúntala a una ruta, a un documento de diseño o a ambos. Si el módulo tiene
+pruebas, las encuentra y también las audita; no hace falta que las
+enumeres. Al terminar recibes en el chat la ruta del reporte, un resumen
+breve, el hallazgo más grave y la brecha más grave de tus pruebas. El
 reporte completo queda en `systemic-out/<alcance>.md` dentro de tu proyecto.
 
 Si la apuntas a un repositorio grande sin foco, propone el subsistema con más
@@ -99,7 +105,7 @@ estado y espera tu respuesta antes de empezar.
 
 ## Cómo funciona una ejecución
 
-Una ejecución pasa por ocho fases. Cada fase escribe sus resultados en disco
+Una ejecución pasa por nueve fases. Cada fase escribe sus resultados en disco
 y un validador los revisa antes de que empiece la siguiente. Nada de lo que
 dice el reporte puede venir de un paso que se saltó.
 
@@ -112,23 +118,25 @@ flowchart TD
   F1 --> G1{"puerta"} --> F2["F2 Modelo: sistemas, operadores, máquinas de estados"]
   F2 --> G2{"puerta"} --> F3["F3 Verificación: doce checks, hallazgos candidatos"]
   F3 --> G3{"puerta"} --> F4["F4 Auditoría: releer, refutar, deduplicar, calificar"]
-  F4 --> G4{"puerta"} --> PR{"¿Reporte previo?"}
-  PR -- "sí" --> F5["F5 Reconciliación con el reporte previo"] --> G5{"puerta"} --> F6
-  PR -- "no" --> F6["F6 Reporte"]
-  F6 --> G6{"puerta"} --> F7(["F7 Fin: ruta, resumen, hallazgo principal"])
+  F4 --> G4{"puerta"} --> F5["F5 Auditoría de pruebas: qué invariantes protegen tus tests"]
+  F5 --> G5{"puerta"} --> PR{"¿Reporte previo?"}
+  PR -- "sí" --> F6["F6 Reconciliación con el reporte previo"] --> G6{"puerta"} --> F7
+  PR -- "no" --> F7["F7 Reporte"]
+  F7 --> G7{"puerta"} --> F8(["F8 Fin: ruta, resumen, hallazgo principal"])
   G4 -. "sigue fallando tras dos correcciones" .-> INC(["Incompleta: el reporte dice por qué"])
 ```
 
 | Fase | Qué hace | Qué escribe | Qué la bloquea |
 |---|---|---|---|
 | F0 Encuadre | Fija qué se analiza, el modo de salida, el idioma y dónde va el reporte | `run.json` | Un alcance grande sin foco |
-| F1 Silueta | Lee cada archivo del alcance y lista lo que prometen la documentación, los docstrings y las constantes | `sources.json` | Un archivo del alcance que no se leyó ni se excluyó con motivo |
-| F2 Modelo | Describe los sistemas, operadores y máquinas de estados que el código realmente construye | `model.json` | Una transición que ningún operador ejecuta; un estado declarado ausente del modelo |
+| F1 Silueta | Lee cada archivo del alcance, pruebas incluidas, y lista lo que prometen la documentación, los docstrings y las constantes | `sources.json` | Un archivo del alcance que no se leyó ni se excluyó con motivo |
+| F2 Modelo | Describe los sistemas, operadores y máquinas de estados que el código realmente construye, y cataloga los invariantes que deben mantener | `model.json` | Una transición que ningún operador ejecuta; un estado declarado ausente del modelo; una máquina sin invariantes |
 | F3 Verificación | Aplica los doce checks; cada defecto sospechado se vuelve candidato | `checks.json` | Menos de doce veredictos; "clean" sin evidencia |
 | F4 Auditoría | Relee la evidencia de cada candidato, intenta refutarlo, fusiona duplicados, califica la severidad | `findings.json` | Una cita que no está en la línea indicada; un candidato sin resolver |
-| F5 Reconciliación | En una segunda ejecución, clasifica cada hallazgo anterior | `reaudit.json` | Un hallazgo anterior sin clasificar; "resolved" sin prueba de la corrección |
-| F6 Reporte | Escribe el reporte a partir de los registros | `systemic-out/<alcance>.md` | Conteos o severidades distintos de los registros |
-| F7 Fin | Confirma la ejecución y responde en el chat | — | — |
+| F5 Auditoría de pruebas | Lee tus pruebas y decide, invariante por invariante, si alguna aserción detectaría una violación | `tests.json` | Una cobertura afirmada sin la aserción que la demuestra; una regla de idempotencia "cubierta" con una sola llamada |
+| F6 Reconciliación | En una segunda ejecución, clasifica cada hallazgo anterior | `reaudit.json` | Un hallazgo anterior sin clasificar; "resolved" sin prueba de la corrección |
+| F7 Reporte | Escribe el reporte a partir de los registros | `systemic-out/<alcance>.md` | Conteos o severidades distintos de los registros |
+| F8 Fin | Confirma la ejecución y responde en el chat | — | — |
 
 **Por qué puedes confiar en el resultado.** Cada hallazgo tiene que pasar
 tres pruebas antes de llegarte. Su evidencia citada debe seguir en la línea
@@ -152,6 +160,7 @@ tu-proyecto/
         ├── model.json        sistemas, operadores, máquinas de estados
         ├── checks.json       doce veredictos y hallazgos candidatos
         ├── findings.json     candidatos confirmados, rechazados y fusionados
+        ├── tests.json        lo que afirman tus pruebas, invariante por invariante
         ├── reaudit.json      solo en una segunda ejecución
         └── *.md / work.md    la bitácora de razonamiento de cada fase
 ```
@@ -192,10 +201,70 @@ Cada check recibe un veredicto en cada ejecución: **findings**, **clean** (con
 lo que se verificó) o **not verifiable** (con lo que faltó). El material
 faltante nunca se reporta como limpio.
 
+## ¿Tus pruebas protegen tus invariantes?
+
+Una suite en verde te dice que sus aserciones se cumplen. No te dice cuáles
+de las reglas de tu sistema defienden esas aserciones. La cobertura por
+líneas tampoco: una prueba que llama a `refund()` y no comprueba nada del
+estado cubre cada línea de `refund()` y no protege nada.
+
+Por eso, después de auditar el código, `systemic` audita tus pruebas contra
+el mismo modelo. Anota los invariantes que tu ciclo de vida debe mantener
+—los que declara tu README y los que se deducen del modelo— y, para cada
+uno, busca la aserción que fallaría si el invariante se rompiera. Lee las
+pruebas; nunca las ejecuta.
+
+Los invariantes son de ocho tipos, y cada tipo solo lo detecta cierto tipo
+de prueba:
+
+| Categoría | La regla que expresa | Ejemplo | Una prueba capaz de detectar la violación |
+|---|---|---|---|
+| `state` | Todo estado escrito es válido | `status` es siempre uno de los valores declarados | Cualquier prueba que revise el estado tras la operación |
+| `transition` | Solo ocurren las transiciones permitidas | Un pedido enviado nunca se cancela | Una prueba por cada movimiento permitido y otra por cada rechazo |
+| `logical` | Los valores de negocio se mantienen coherentes | El total es siempre la suma de los ítems | Cualquier prueba que revise la relación |
+| `temporal` | Lo que debe (o nunca debe) ocurrir en el tiempo | Nunca enviado antes de pagado; un ticket cerrado nunca se reabre | Pruebas que ejecutan una secuencia de operaciones |
+| `repetition` | Hacerlo dos veces equivale a hacerlo una | Un webhook reenviado no cobra dos veces | Pruebas que repiten la llamada o el evento |
+| `concurrency` | Operaciones simultáneas no se pisan | Dos pagos a la vez no pierden una actualización | Pruebas que fuerzan una intercalación |
+| `atomicity` | Todo o nada | Si falla el courier, se deshace la reserva de stock | Pruebas que hacen fallar una dependencia a mitad de camino |
+| `algebraic` | Operaciones que se deshacen o reflejan entre sí | Reanudar un pedido pausado restaura su estado anterior | Pruebas que componen operaciones y comparan resultados |
+
+Cada invariante termina con un nivel de cobertura:
+
+| Nivel | Significa |
+|---|---|
+| `asserted` | Una prueba lo afirma, con una técnica capaz de detectar la violación. El reporte cita la aserción. |
+| `weak` | Las pruebas ejecutan ese código, pero nada fallaría ante una violación: el camino feliz de una guarda, un webhook entregado una sola vez, una prueba de envío en la que nada falla nunca. |
+| `contradicted` | Una prueba afirma lo contrario. Pasa *gracias al* defecto, y corregir el bug la pondrá en rojo. |
+| `uncovered` | Ninguna prueba lo toca. El reporte dice qué se buscó. |
+| `not verifiable` | Las pruebas quedaron fuera del alcance que indicaste. |
+
+El reporte lo resume en una tabla por ejecución (los nombres de categoría y
+de nivel se quedan en inglés en todos los idiomas):
+
+```markdown
+| Categoría | Invariantes | asserted | weak | contradicted | uncovered | not verifiable |
+|---|---|---|---|---|---|---|
+| state | 1 | 0 | 0 | 1 | 0 | 0 |
+| transition | 2 | 1 | 1 | 0 | 0 | 0 |
+| repetition | 1 | 0 | 1 | 0 | 0 | 0 |
+| atomicity | 1 | 0 | 1 | 0 | 0 | 0 |
+| …
+```
+
+También te dice, para cada hallazgo, si tu suite lo **detecta**
+(`detected`), lo deja **sin detectar** (`undetected`) o lo **consagra**
+(`enshrined`): afirma como correcto el comportamiento defectuoso. Los
+hallazgos consagrados van primero: son aquellos en los que corregir el
+código rompe tu build. Estas brechas se reportan en su propia sección; nunca
+añaden hallazgos ni cambian severidades. Si el alcance no tiene pruebas, el
+reporte lo dice y cada invariante figura como `uncovered`. Si le pides que
+deje fuera las pruebas, no las abre, y el reporte dice que la cobertura no se
+evaluó en lugar de afirmar que algo no está probado.
+
 ## Modos de salida
 
 **`functional` es el modo por defecto; `full` añade el detalle sistémico.**
-Ambos ejecutan las mismas ocho fases sobre la misma evidencia. Solo cambia el
+Ambos ejecutan las mismas nueve fases sobre la misma evidencia. Solo cambia el
 reporte.
 
 | Contenido | `functional` (por defecto) | `full` |
@@ -207,6 +276,7 @@ reporte.
 | Diagramas de estados y matrices estado × operador | Solo en el espacio de trabajo | En el reporte |
 | Teoría GST y el check detrás de cada hallazgo | Omitido | Incluido |
 | Cobertura de los doce checks | En el espacio de trabajo; límites materiales en el reporte | Tabla completa de veredictos |
+| Cobertura de invariantes por pruebas | Tabla por categoría y las brechas que importan, en palabras simples | Tabla por categoría, cada invariante y las celdas estado × operador que alcanzan tus pruebas |
 
 Elígelo con palabras; no son flags de CLI:
 
@@ -370,25 +440,31 @@ está en
 ## Estructura del repositorio
 
 ```
-SKILL.md                      las ocho fases, reglas compartidas, etiquetas y severidad
+SKILL.md                      las nueve fases, reglas compartidas, etiquetas y severidad
 references/
   run-contracts.md            la forma exacta de cada archivo que escribe una ejecución
   gst-framework.md            el vocabulario conceptual (se lee en F2)
   checks.md                   cómo detectar cada uno de los doce checks (se lee en F3)
+  invariants.md               categorías de invariantes y cobertura por pruebas (se lee en F2 y F5)
   output-functional.md        formato del reporte functional (por defecto)
   output-full.md              formato del reporte sistémico detallado
 scripts/
   systemic_check.py           el validador de puertas (Python 3.9+, biblioteca estándar)
 evals/
-  evals.json                  14 evals de ejecución con aserciones
+  evals.json                  23 evals de ejecución con aserciones
+  COVERAGE.md                 qué eval y qué test cubre cada comportamiento de la skill
   test_systemic_check.py      tests del validador: una violación de contrato por test
   test_adversarial_fixtures.py contraejemplos ejecutables de los fixtures
-  fixtures/orders/            un módulo de código con defectos sembrados
+  fixtures/orders/            un módulo de código con defectos sembrados y una suite en verde que no los ve
   fixtures/rental-doc/        un documento de diseño con fallas sembradas
   fixtures/booking-saga/      una saga con compensaciones: fallo parcial y lazos
-  fixtures/clean-ticket/      un ciclo de vida correcto: el control de falsos positivos
+  fixtures/clean-ticket/      un ciclo de vida correcto con una suite sólida: el control de falsos positivos
   fixtures/guarded-elsewhere/ caminos defendidos más defectos de reembolso y recuperación
   fixtures/independent-ledgers/ causas independientes e impacto acotado
+  fixtures/stock-reservations/ máquina implícita, concurrencia, un crítico justificado, pruebas con trampas
+  fixtures/monorepo/          un repositorio sin foco con mapa de graphify: propuesta de alcance
+  fixtures/collision/         un archivo ajeno en la ruta por defecto del reporte
+  fixtures/resume/            una ejecución interrumpida en F5 cuyo código cambió desde F1
   fixtures/rerun/             un reporte previo solo en Markdown (re-auditoría legacy)
   fixtures/rerun-external/    un sucesor ausente: re-auditoría no verificada
   fixtures/rerun-json/        una ejecución previa con findings.json (re-auditoría por huella)
@@ -417,10 +493,17 @@ probada.
 fixture y califican el reporte y el espacio de trabajo contra aserciones
 escritas. Para correr una: copia la skill a una ubicación aislada, sustituye
 `<SKILL_DIR>` en el prompt por su ruta absoluta, ejecuta el prompt desde un
-directorio de trabajo vacío y revisa cada aserción. Las evals 8, 9, 13 y 14
-necesitan sembrar antes un reporte previo; la preparación está en el campo
+directorio de trabajo vacío y revisa cada aserción. Las evals 8, 9, 13, 14 y
+20–23 necesitan preparación previa (un archivo sembrado, una ejecución
+copiada o una máquina sin Python); la preparación está en el campo
 `notes` de `evals.json`. Los casos 1–10 y 14 piden `full`; los 11–13
-ejercitan la selección de modo y el historial entre modos.
+ejercitan la selección de modo y el historial entre modos; los 15 y 16, la
+auditoría de pruebas; los 17–20 cubren concurrencia, límites del sistema, un
+crítico justificado, propuestas de alcance, graphify, colisiones de nombre,
+el perfil standard y pruebas excluidas; los 21–23, reanudar una ejecución
+interrumpida, revisar las puertas a mano sin Python y una ejecución
+incompleta. [`evals/COVERAGE.md`](evals/COVERAGE.md) mapea cada
+comportamiento de la skill a las evals y pruebas que lo cubren.
 
 Las evals 6 y 7 son las que más importan a medida que la skill cambia. Una
 herramienta que reporta problemas vale lo que vale su tasa de falsos

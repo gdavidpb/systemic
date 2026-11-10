@@ -4,8 +4,8 @@ Retain the detailed systemic format, with functional impact as well as the
 theoretical diagnosis. Translate headings and prose into the report's language;
 honesty labels and severities remain the shared fixed keywords.
 
-Render it from `findings.json`, `checks.json`, `model.json` and, on a
-re-audit, `reaudit.json`, never from memory. Gate G6 checks the result
+Render it from `findings.json`, `checks.json`, `model.json`, `tests.json`
+and, on a re-audit, `reaudit.json`, never from memory. Gate G7 checks the result
 against those records; see `references/run-contracts.md`.
 
 ```markdown
@@ -38,13 +38,32 @@ operator matrix from checks.json.>
   conditions and impact not verified; confidence high/medium/low with its basis>
 - **Recommendation**: <concrete action>
 
-<For a re-audit, include the two tables defined in SKILL.md F6, even if
+<For a re-audit, include the two tables defined in SKILL.md F7, even if
 one is empty: Resolved since last report | previous finding | evidence of
 the fix |, and Not verified | previous finding | last verified evidence |
 what changed | what is needed |.>
 
 <When findings.json has rejected candidates, include a compact table:
 candidate + evidence that refuted it. Omit it when there are none.>
+
+## Invariant coverage by tests
+<State whether the suite is in scope, absent or out of scope, and that it was
+read, not run. Then the category table; the header row is translated, the
+category names and the order are fixed:>
+| Category | Invariants | asserted | weak | contradicted | uncovered | not verifiable |
+|---|---|---|---|---|---|---|
+| state | N | N | N | N | N | N |
+<… transition, logical, temporal, repetition, concurrency, atomicity, algebraic>
+
+<For every machine with a matrix, one line with the counts the validator
+computes from cells_tested, followed by which cells they are:>
+M-1 cells tested: N/M
+
+<A per-invariant table: invariant · level · the cited assertion or why
+(searched for what, which technique was missing).>
+
+<A findings-against-the-suite table: finding title · detected, undetected or
+enshrined, with the test that enshrines or detects it.>
 
 ## Missing pieces
 <Supported architectural recommendations; omit speculative recommendations.>

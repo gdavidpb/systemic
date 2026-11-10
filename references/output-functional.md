@@ -7,8 +7,8 @@ or theoretical architecture explanations. Concise does not mean incomplete:
 retain independent findings, severity, honesty labels, evidence, conditions,
 confidence and unverified antecedents.
 
-Render it from `findings.json` (and `reaudit.json` on a re-audit), never
-from memory. Gate G6 checks the result against those records; see
+Render it from `findings.json`, `tests.json` (and `reaudit.json` on a
+re-audit), never from memory. Gate G7 checks the result against those records; see
 `references/run-contracts.md`.
 
 Use this structure, translating headings and prose into the report's language:
@@ -39,6 +39,25 @@ new: N · persisting: N · resolved: N · not verified: N
 evidence requirements. Describe the changes and missing verification in
 functional language; do not copy an old theoretical diagnosis.>
 
+## What your tests protect
+<One or two sentences: whether a suite was found, that it was read and not
+run, and the gap that matters most — an enshrined finding first ("the test
+suite asserts the duplicated charge as correct, so fixing it turns a test
+red"), then a category with nothing asserted.>
+
+<The invariant coverage table. Translate the header row; the category names
+in the first column stay in English, in this order:>
+| Category | Invariants | Asserted | Weak | Contradicted | Uncovered | Not verifiable |
+|---|---|---|---|---|---|---|
+| state | N | N | N | N | N | N |
+<… one row each for transition, logical, temporal, repetition, concurrency,
+atomicity, algebraic>
+
+<Then, in everyday language, the findings the suite does not protect:
+"No test would notice that a redelivered payment is counted twice." List
+enshrined findings first, then undetected ones. Do not mention invariant ids,
+techniques or matrix cells.>
+
 ## Scope and pending verification
 <Scope actually reviewed; functional behavior that could not be verified;
 material missing evidence; deliberate product limits relevant to a decision.
@@ -46,8 +65,9 @@ No twelve-check coverage table or theoretical limits discussion.>
 ```
 
 Each confirmed finding gets exactly one such heading, with its recorded
-severity and label. Do not add a `**Check**` line, a mermaid block or a
-twelve-row coverage table; G6 rejects them in this mode.
+severity and label. Test gaps never get a heading of their own: they
+live in the tests section and never change the count line. Do not add a `**Check**` line, a mermaid block or a
+twelve-row coverage table; G7 rejects them in this mode.
 
 If there are no verified findings, say so, identify the behavior checked and
 keep the pending-verification section. Never invent findings or a

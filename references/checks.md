@@ -83,6 +83,9 @@ stock ≥ 0) and what happens when the operator maintaining them fails halfway.
 external API, table + file) without a transaction or compensation. Ask: if it
 fails after write 1 and before write 2, which invariant is broken? Who
 repairs it? `TODO: transaction` comments are confessions.
+The invariants themselves are catalogued in F2 (`references/invariants.md`);
+a candidate that breaks one lists its `I-n` in `refs`, so F5 can check
+whether the suite would have caught it.
 **Severity**: high for a demonstrated broken business invariant; critical
 requires supported severe loss or corruption under the authoritative rubric.
 

@@ -111,7 +111,8 @@ names one. A profile changes cost, never the evidence bar.
    across context compaction and lets an interrupted run resume at
    `run.json.phase`. To resume, log a `resumed` event under the phase in
    `run.json`, then run `systemic_check.py all <workspace>` before anything
-   else, logging its result as one entry under the earliest failing phase: a source that
+   else, logging its result right after `resumed` as one entry under the
+   earliest failing phase: a source that
    changed since F1, or any earlier gate that no longer passes, sends the
    run back to the earliest failing phase as rule 2 says. Redo means
    rebuilding that phase's files from its inputs, keeping stable ids where

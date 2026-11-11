@@ -209,7 +209,7 @@ So after auditing the code, `systemic` audits your tests against the same
 model. It writes down the invariants your lifecycle must keep — the ones your
 README declares and the ones the model implies — and for each one it looks
 for the assertion that would fail if the invariant broke. It reads the tests;
-it never runs them.
+unless you ask it to, it never runs them.
 
 Invariants come in eight kinds, and each kind can only be caught by a certain
 kind of test:
@@ -256,6 +256,38 @@ tests, the report says so and every invariant reads as uncovered. If you ask
 it to leave the tests out, it does not open them, and the report says
 coverage was not assessed rather than claiming anything is untested.
 
+## Letting it run your code
+
+By default `systemic` is **read-only**. It does not run your code and it does
+not run your tests: every finding rests on lines it read and cites, which
+you can check without trusting its machine. Running someone's code has side
+effects nobody asked for, and a green or red suite answers a different
+question from "which rules do these assertions defend?".
+
+You can lift that for one run by saying so:
+
+```
+/systemic audit the order lifecycle in src/orders — you can run the code and the tests to confirm
+```
+
+Then it uses execution to **confirm** what reading found, never to replace
+it:
+
+- it reproduces the trace of a finding (the operators, in order, and the
+  state they leave) before reporting it;
+- it runs the test it says detects a defect, to see it red, and the one it
+  says enshrines a defect, to see it green;
+- for an invariant it calls `asserted`, it can break the rule in a copy of
+  your code and check that the cited test notices — the one thing reading
+  alone cannot show.
+
+It still works under limits: it never changes the project it analyzes
+(mutations happen in a copy, and the validator re-hashes every source), it
+calls no network, database or external service, and it installs nothing. The
+scripts it ran are kept in the workspace under `traces/`, and the report
+says what was executed and what was left as reasoned. The permission is for
+that run only: a later run is read-only again unless you repeat it.
+
 ## Output modes
 
 **`functional` is the default; `full` adds the systemic detail.** Both run
@@ -296,7 +328,8 @@ Every finding carries one honesty label:
 Severity is `critical` / `high` / `medium` / `low`, rated by the damage the
 finding actually causes. Critical requires supported severe material loss,
 irreversibility or persistent corruption with severe impact; a monetary
-domain or invalid value alone is not enough. **Confidence** (high / medium /
+domain or invalid value alone is not enough. A wrong value that is only
+displayed, that nothing decides on and that can be recomputed, is medium. **Confidence** (high / medium /
 low) is separate from severity: it says how well the diagnosis is supported,
 not how bad it is.
 
@@ -349,9 +382,13 @@ code review. The skill picks a profile from the size of the scope:
 
 - **quick** — about six files or fewer, or a single lifecycle. The same
   records and gates; the reasoning goes into one `work.md` log.
-- **standard** — larger scopes. One log per phase. When the environment
-  supports subagents and there are many candidates, an independent verifier
-  that never saw the modeling audits the evidence.
+- **standard** — larger scopes. One log per phase.
+
+Where the environment supports subagents, an **independent verifier** that
+never saw the modeling re-reads the evidence and tries to refute the
+findings: every candidate in `standard`, and the findings rated critical or
+high in `quick`. `findings.json` records which findings got that second look
+(`verification: independent`) and which only their author's (`self`).
 
 You can ask for one: "…, use the quick profile". Profiles change cost, never
 the evidence required.
@@ -376,6 +413,11 @@ You can run the validator yourself at any time:
 ```sh
 python3 ~/.claude/skills/systemic/scripts/systemic_check.py all systemic-out/orders-module
 ```
+
+The same script has two helpers the skill uses so that it never derives by
+hand what the validator recomputes: `hash <workspace>` prints the hash and
+line count of every file in scope, and `counts <workspace> --write` fills the
+per-category coverage table.
 
 ## Language
 
@@ -431,14 +473,20 @@ references/
   run-contracts.md            the exact shape of every file a run writes
   gst-framework.md            the conceptual vocabulary (read in F2)
   checks.md                   how to detect each of the twelve checks (read in F3)
+  dedup.md                    one finding per root cause: what groups, what stays separate (read in F4)
   invariants.md               invariant categories and test coverage (read in F2 and F5)
-  output-functional.md        functional report format (default)
-  output-full.md              detailed systemic report format
+  reaudit.md                  classifying the findings of a previous report (read in F6, re-audits only)
+  output-functional.md        functional report format and style (default)
+  output-full.md              detailed systemic report format and style
+  run-protocol.md             resuming, going back a phase, a gate that cannot pass, no Python
+  execution.md                running the code or its tests, only when the user allows it
 scripts/
-  systemic_check.py           the gate validator (Python 3.9+, standard library)
+  systemic_check.py           the gate validator and its helpers (Python 3.9+, standard library)
 evals/
-  evals.json                  23 forward evals with assertions
+  evals.json                  26 forward evals with assertions; 24 and 25 are held out
+  trigger-evals.json          queries that should and should not trigger the skill
   COVERAGE.md                 which eval and test covers each behavior of the skill
+  BASELINE.md                 the held-out cases with the skill and without it
   test_systemic_check.py      validator tests: one contract violation per test
   test_adversarial_fixtures.py executable counterexamples for the fixtures
   fixtures/orders/            a code module with seeded defects and a green suite that misses them
@@ -448,6 +496,8 @@ evals/
   fixtures/guarded-elsewhere/ defended paths plus refund/recovery defects
   fixtures/independent-ledgers/ separate causes and bounded impact
   fixtures/stock-reservations/ an implicit machine, concurrency, a justified critical, tests with traps
+  fixtures/job-leases/        held out, JavaScript: a job queue with leases and a node:test suite
+  fixtures/approvals/         held out: defenses in a SQL schema and one transition function, one drift
   fixtures/monorepo/          an unfocused repository with a graphify map: scope proposal
   fixtures/collision/         an unrelated file at the default report path
   fixtures/resume/            a run interrupted at F5 whose source changed since F1
@@ -461,7 +511,10 @@ evals/
 
 There are two kinds of tests.
 
-**Deterministic tests** need only Python:
+**Deterministic tests** need only Python: 3.9 for the validator's tests,
+3.10 or newer for the fixtures' (the fixtures use newer syntax), and Node.js
+for the one JavaScript fixture, whose tests are skipped without it. CI runs
+them on every push and pull request:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -v
@@ -470,9 +523,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s evals -p 'test_*.py' -
 `test_systemic_check.py` copies the golden run, breaks one contract per test
 — a missing verdict, a quote moved off its line, a critical finding without
 its justification, a report count that disagrees with the records — and
-asserts that the right gate rejects it. `test_adversarial_fixtures.py`
-executes the defects planted in the fixtures, so the evals' ground truth is
-itself tested.
+asserts that the right gate rejects it. It also checks that what the
+references tell the model matches what the validator enforces, and that
+`SKILL.md` stays within the skill format (a description of at most 1024
+characters, a body of at most 500 lines, every reference named and present).
+`test_adversarial_fixtures.py` executes the defects planted in the fixtures,
+so the evals' ground truth is itself tested.
 
 **Forward evals** (`evals/evals.json`) run the skill on a fixture and grade
 the report and workspace against written assertions. To run one: copy the
@@ -485,9 +541,29 @@ request `full`; 11–13 exercise mode selection and history across modes; 15
 and 16 exercise the test audit; 17–20 cover concurrency, system limits,
 a justified critical, scope proposals, graphify, name collisions, the
 standard profile and excluded tests; 21–23 cover resuming an interrupted
-run, checking the gates by hand without Python, and an incomplete run.
+run, checking the gates by hand without Python, and an incomplete run; 26
+covers a run where the user allowed execution.
 [`evals/COVERAGE.md`](evals/COVERAGE.md) maps every behavior of the skill to
 the evals and tests that cover it.
+
+**Held-out evals.** Cases 24 and 25 (`"split": "holdout"`) exist to measure,
+not to tune. The other cases were used while the skill's text was written,
+so passing them says little about a lifecycle the text has never seen. When
+a held-out case fails, fix the general instruction or add a dev fixture that
+shows the same weakness; do not edit the skill until that one case passes.
+24 is a job queue in JavaScript with a `node:test` suite; 25 is a sound
+module whose defenses live in a SQL schema, with one planted drift.
+[`evals/BASELINE.md`](evals/BASELINE.md) records how both scored with the
+skill and without it.
+
+**Trigger evals** (`evals/trigger-evals.json`) are a different kind of
+test: twenty realistic requests, half of which should make the skill
+trigger and half of which should not (a code review, a failing test, line
+coverage, writing a new state machine). They test the `description` in
+`SKILL.md`, which is all Claude sees when it decides whether to use the
+skill. Run them with the trigger evaluation of Anthropic's `skill-creator`
+skill after changing the description, one worker per project directory
+(why, and the last result, are in [`evals/BASELINE.md`](evals/BASELINE.md)).
 
 Evals 6 and 7 matter most as the skill changes. A tool that reports problems
 is only as useful as its false-positive rate, and every other eval pushes

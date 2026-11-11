@@ -14,9 +14,12 @@ systemic-out/
     ├── tests.json      F5
     ├── reaudit.json    F6, only when a previous report exists
     ├── prior/          F0, only on a re-audit: report.md (+ findings.json)
+    ├── traces/         only when the user allowed execution: the scripts run **[gate]**
     └── 00-scope.md … 06-reaudit.md   phase logs (profile standard)
         or work.md                    single log (profile quick), one
-                                      `## F<n>` section per finished phase **[gate]**
+                                      `## F<n>` section per phase that has a
+                                      log: F0–F5, and F6 on a re-audit
+                                      **[gate]**; F7 and F8 write none
 ```
 
 The JSON files are the source of truth. The report is rendered from them and
@@ -60,15 +63,17 @@ Conventions:
 | `source_ref` | `{"commit": <sha or null>, "dirty": <bool or null>}` |
 | `validation` | `script` when the validator ran; `manual` when it could not |
 | `graph_informed` | `true` when `graphify-out/graph.json` informed the scope; omitted or `false` otherwise |
+| `execution`, `execution_source` | `read_only`\|`allowed`; `explicit`\|`default`. Omitted means `read_only`. `allowed` requires `explicit`: the user said in this request that the code or its tests may be run **[gate]**. See `references/execution.md` |
 | `phase` | the phase in progress, `F0`…`F8`; an incomplete run keeps the phase whose gate failed **[gate]** |
 | `status` | `in_progress`, `needs_scope`, `complete`, `incomplete` |
 | `scope_proposal` *(text)* | required when `status` is `needs_scope` **[gate]** |
 | `incomplete_reason` *(text)* | required when `status` is `incomplete` **[gate]**; an incomplete run may keep targets that no longer exist when its reason says so |
-| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped"\|"resumed", "detail"}]` **[gate]**; `skipped` records F6 when there is no previous report; `returned_to` names in `phase` the phase returned to, and a complete run shows a later `gate_passed` for it **[gate]**; `resumed` records picking up an interrupted run; F8 logs the final `all` as `gate_passed` (or `gate_failed`), with `checked manually` in the detail when Python was unavailable |
+| `log` | `[{"phase", "event": "gate_passed"\|"gate_failed"\|"returned_to"\|"skipped"\|"resumed", "detail"}]` **[gate]**; `skipped` records F6 when there is no previous report; `returned_to` names in `phase` the phase returned to, and a complete run shows a later `gate_passed` for it **[gate]**; `resumed` records picking up an interrupted run (`references/run-protocol.md` has the procedure for both); F8 logs the final `all` as `gate_passed` (or `gate_failed`), with `checked manually` in the detail when Python was unavailable |
 
 **Re-audit setup.** When `systemic-out/<slug>.md` already exists and is a
 systemic report of the same scope, F0 archives it before anything is
-overwritten. The report goes to `<slug>/prior/report.md`. A previous
+overwritten. The report is copied to `<slug>/prior/report.md` (F7 later
+replaces the original). A previous
 `<slug>/findings.json`, if there is one, goes to `<slug>/prior/findings.json`;
 in that case `format` is `json`, otherwise `md-legacy` **[gate]**. Discard the
 rest of the previous workspace, including any older `prior/`.
@@ -85,10 +90,15 @@ rest of the previous workspace, including any older `prior/`.
 }
 ```
 
-- `sha256` and `lines` describe the file as read **[gate]**. `lines` is the
-  number of lines as Python's `splitlines()` counts them: `wc -l` plus one
-  when the file does not end with a newline. If a later phase
-  finds a different hash, the source changed during the run: return to F1.
+- `sha256` and `lines` describe the file as read **[gate]**. Do not derive
+  them: `systemic_check.py hash <run-dir>` prints one
+  `{"path", "sha256", "lines"}` entry per file under `run.json.targets`
+  (or under the paths you pass after the run directory), with the numbers
+  G1 recomputes. Copy the entries of the files you read and add `read`,
+  `role` and `ranges`. Only without Python: `lines` is the number of lines
+  as Python's `splitlines()` counts them, `wc -l` plus one when the file
+  does not end with a newline. If a later phase finds a different hash, the
+  source changed during the run: return to F1.
 - `read: "partial"` requires `ranges: [[start, end], …]`. A citation outside
   those ranges is rejected **[gate]**, so a partially read file cannot support
   a claim about what was not read.
@@ -116,6 +126,7 @@ rest of the previous workspace, including any older `prior/`.
                                   "operator": "O-7", "evidence": [cite]}]}],
   "divergences": [{"id": "V-1", "claims": ["D-2"], "description": "…", "evidence": [cite]}],
   "claims_satisfied": ["D-7"],
+  "claims_unverified": [{"claim": "D-9", "reason": "the refund-service that enforces it is outside the scope"}],
   "invariants": [{"id": "I-6", "category": "repetition",
                   "statement": "Redelivering a payment event leaves total_paid unchanged",
                   "machine": null, "operators": ["O-10"], "source": "declared",
@@ -129,7 +140,25 @@ rest of the previous workspace, including any older `prior/`.
   (no guard).
 - Every transition names a modeled operator and states of its machine **[gate]**.
 - An `implicit` machine (co-varying flags and nullable fields) lists `fields` **[gate]**.
-- Every claim is either in `claims_satisfied` or linked to a divergence **[gate]**.
+  It usually has no declaration: `declared_states` is `[]` and `declared_in`
+  cites the nearest thing to one (a schema line, a table in the README).
+- What the scope does not show is recorded as unknown, not guessed:
+  `initial: null`, `terminal: []` and `transitions: []` are valid for a
+  machine whose writers live outside the scope.
+- A transition names the operator that performs it. One caused by time (a
+  lease that expires) names the operator that observes it (a reaper, a
+  sweep). If nothing in scope observes it, it is not a transition: say in
+  the element's `representation` that the state is derived when read.
+- Every claim is in exactly one of three places **[gate]**: in
+  `claims_satisfied`; linked to a divergence, when the code departs from
+  it; or in `claims_unverified` with a `reason` *(text)*, when the material
+  in scope cannot settle it either way (the behavior is delegated to a
+  service outside the scope, the claim is about a property no file shows).
+  An unverified claim is not a divergence: it produces no candidate, and
+  `full` lists it under its limits. A finding may still rest on one as a
+  stated premise (a severity that depends on "this table is the only
+  record of a sale"): its impact says the rating depends on that
+  declaration and what would change it.
 - `invariants` is the catalog of `references/invariants.md`. Each has a
   unique `I-n`, a `category` among `state`, `transition`, `logical`,
   `temporal`, `repetition`, `concurrency`, `atomicity`, `algebraic`, a
@@ -164,13 +193,22 @@ rest of the previous workspace, including any older `prior/`.
 - `RISK` candidates need `condition` *(text)*; `AMBIGUITY` candidates need
   `question` *(text)* **[gate]**.
 - Every machine with ≤ 8 declared states (built states when none are
-  declared) has a matrix unless check 3 is `not_verifiable` **[gate]**. It has
-  a row for every built state and one cell per operator **[gate]**:
+  declared) has a matrix unless check 3 is `not_verifiable` **[gate]**. Its
+  columns are the operators that read or write the machine's fields: every
+  operator that performs one of its transitions **[gate]**, plus those that
+  act on it without moving it. Leave out an operator that never touches the
+  machine. It has a row for every built state, including a declared state
+  nothing writes (fill it from what each operator would do there), and one
+  cell per operator **[gate]**:
   - `defined`: the operator performs a transition the declared rules allow
     from this state.
   - `guarded`: the operator refuses this state with an explicit check.
     An operator that deliberately leaves this state untouched (a sweep that
-    filters it out, an idempotent no-op) is also `guarded`, with a note.
+    filters it out, an idempotent no-op) is also `guarded`, with a note. So
+    is a refusal that works through another field (a holder check that
+    fails because `leased_by` is null), when an invariant ties that field
+    to the state; the note names the field, and a state the code can reach
+    with that field still set is a `hole`.
   - `hole`: the operator proceeds without considering this state, including
     a write the declared rules forbid.
   Every `hole` has a note naming a candidate (`candidate`, or `candidates`
@@ -194,6 +232,7 @@ rest of the previous workspace, including any older `prior/`.
     "condition": null, "question": null,
     "impact": {"demonstrated": "…", "conditional": null, "not_verified": null},
     "confidence": {"level": "high", "basis": "…"},
+    "verification": "independent",
     "recommendation": "…"
   }],
   "rejected": [{"candidate": "C-10", "reason": "…", "evidence": [cite]}],
@@ -205,7 +244,12 @@ rest of the previous workspace, including any older `prior/`.
   `rejected` or `merged` **[gate]**.
 - Check-3 findings whose candidates (or merged candidates) reference
   transitions of the same machine are one finding; any further one carries
-  `separate_because` *(text)* **[gate]**.
+  `separate_because` *(text)* **[gate]**. `references/dedup.md` says what
+  groups and what stays separate.
+- `verification` says who re-checked the evidence and tried to refute the
+  finding in F4: `independent` for a subagent that never saw the modeling,
+  `self` for the author. Omitted means `self`; any other value is rejected
+  **[gate]**.
 - `fingerprint`: `<file>:<operator or field>:<property>:<defect>`, lowercase,
   `[a-z0-9._:/-]` **[gate]**. Derive it from the root cause, not from the
   title or the wording, so the same defect gets the same fingerprint on the
@@ -262,20 +306,35 @@ rest of the previous workspace, including any older `prior/`.
   `sequence`, `property`, `stateful`, `repetition`, `concurrency`,
   `fault_injection`, `metamorphic`, modeled `operators`, and a quoted
   citation in a `role: test` file **[gate]**. Cite the test's definition
-  line (or any line inside it): the validator reads the enclosing test body
-  — from the nearest test definition above the cited line (`def`, `it(`,
-  `test(`, `func Test`, `@Test`) to the next definition at the same or a
-  lower indent — and checks that some techniques are visible in it
-  **[gate]**:
-  - `concurrency`: a primitive that forces overlap (`Barrier`, `Event(`,
+  line (or any line inside it): the validator reads the enclosing test —
+  its decorators and its body, from the nearest definition above the cited
+  line (`def`, `class`, `it(`, `test(`, `describe(`, `func Test`, `t.Run(`,
+  `@Test`, `fn`) to the next definition at the same or a lower indent — and
+  checks that some techniques are visible in its code **[gate]**. Comments,
+  string literals and the name of the test are ignored: a word in a test
+  name or a docstring says nothing about what the test does.
+  - `concurrency`: a primitive that forces overlap — `Barrier`, `Event(`,
     `Latch`, `Semaphore`, `Thread(`, `threading.`, `gather(`,
-    `Promise.all`, `go func`, `WaitGroup`).
-  - `fault_injection`: a provoked failure (`side_effect`, `raise`,
-    `throw`, `raises`, `patch(`, `monkeypatch`, `Error(`, `Exception(`).
-  - `property`: a generator or a loop over a domain (`@given`,
-    `hypothesis`, `fc.property`, `for `, `range(`, `product(`, `subTest`,
-    `parametrize`).
+    `Promise.all`, `Promise.race`, `go func`, `WaitGroup`, `errgroup`,
+    `spawn(`.
+  - `fault_injection`: a dependency made to fail — `side_effect`, `patch(`,
+    `patch.object(`, `monkeypatch`, `mockRejectedValue`,
+    `mockImplementation`, `mock.method(`, `Promise.reject(`, `thenThrow(`,
+    `doThrow(`, `errors.New(`, `fmt.Errorf(`, or a `raise` / `throw`
+    statement. Expecting an exception (`assertRaises`, `pytest.raises`,
+    `toThrow`, `assert.rejects`) is an assertion, not an injected fault: a
+    guard test is `example`.
+  - `property`: a generator, a parametrization or a loop over a domain —
+    `@given`, `hypothesis`, `fc.assert`, `fc.property`, `forall`,
+    `subTest`, `product(`, `parametrize`, `quickcheck`, `proptest`,
+    `.each(`, `range(`, `.forEach(`, or a `for` loop or comprehension.
   - `repetition`: the same call twice, or a loop.
+
+  When the mechanism lives in a helper the test uses — a fake defined
+  elsewhere whose method raises, a fixture that starts the threads — add
+  `technique_evidence`: quoted citations, in `role: test` files, of the
+  helper lines that provide it. The validator then also reads the
+  definition enclosing each cited line **[gate]**.
 - `coverage`: exactly one entry per invariant **[gate]**, with a `level`:
   - `asserted`: at least one test and a quoted citation of the assertion in a
     `role: test` file **[gate]**. For `temporal`, `repetition`,
@@ -299,10 +358,11 @@ rest of the previous workspace, including any older `prior/`.
   entry is `enshrined` **[gate]**.
 - `by_category` has the eight categories and equals the count the validator
   recomputes from `invariants` and `coverage` **[gate]**. Never write it by
-  hand: write `{}`, run G5 and copy the JSON it prints. Without Python,
-  count it yourself: all eight categories in this order, each with
+  hand: `systemic_check.py counts <run-dir> --write` computes it and writes
+  it into `tests.json` (without `--write` it only prints it). Without
+  Python, count it yourself: all eight categories in this order, each with
   `total` (invariants of that category) and one count per level, zeros
-  included. The planned first failure does not apply then. Shape:
+  included. Shape:
   `{"state": {"total": 1, "asserted": 0, "weak": 0, "contradicted": 1,
   "uncovered": 0, "not_verifiable": 0}, "transition": {…}, …}` with the
   categories `state, transition, logical, temporal, repetition,
@@ -376,6 +436,14 @@ The validator reads the rendered Markdown and checks it against the records:
 ```sh
 python3 <skill-dir>/scripts/systemic_check.py G5 systemic-out/<slug>
 python3 <skill-dir>/scripts/systemic_check.py all systemic-out/<slug>
+```
+
+Two helper commands compute what the gates would otherwise make you derive
+by hand. They validate nothing and never fail a gate:
+
+```sh
+python3 <skill-dir>/scripts/systemic_check.py hash systemic-out/<slug>             # F1: sources.json entries
+python3 <skill-dir>/scripts/systemic_check.py counts systemic-out/<slug> --write   # F5: tests.json.by_category
 ```
 
 The project root defaults to two levels above the workspace; pass

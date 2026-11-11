@@ -41,7 +41,8 @@ functional language; do not copy an old theoretical diagnosis.>
 
 ## What your tests protect
 <One or two sentences: whether a suite was found, that it was read and not
-run, and the gap that matters most — an enshrined finding first ("the test
+run (or, when execution was allowed, which tests were run and what that
+confirmed), and the gap that matters most — an enshrined finding first ("the test
 suite asserts the duplicated charge as correct, so fixing it turns a test
 red"), then a category with nothing asserted.>
 
@@ -59,8 +60,9 @@ enshrined findings first, then undetected ones. Do not mention invariant ids,
 techniques or matrix cells.>
 
 ## Scope and pending verification
-<Scope actually reviewed; functional behavior that could not be verified;
-material missing evidence; deliberate product limits relevant to a decision.
+<Scope actually reviewed; functional behavior that could not be verified,
+including what the documentation promises and the material cannot settle;
+whether any code was executed, and what; material missing evidence; deliberate product limits relevant to a decision.
 No twelve-check coverage table or theoretical limits discussion.>
 ```
 
@@ -78,3 +80,13 @@ For example, describe a failed retry as: "A payment that fails on its first
 delivery remains unapplied even when the same payment is retried after the
 invoice is issued." The consequence is an unpaid invoice despite the retry;
 it is not evidence by itself of external monetary loss or production frequency.
+
+## Style
+
+- Explain the behavior and its impact in everyday language: "retrying the
+  refund records it twice", not "closure under repetition fails".
+- Prioritize: a few well-evidenced findings beat 30 trivial ones. If there
+  are more than ~10, keep the minor ones brief: their heading plus one line
+  each for evidence and action.
+- Lead with the corrective action that has the greatest verified functional
+  benefit; do not append a theoretical architecture explanation.

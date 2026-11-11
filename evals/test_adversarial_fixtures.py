@@ -6,8 +6,13 @@ All providers are local doubles. Logical time is assumed, never measured.
 from contextlib import contextmanager
 import importlib
 import itertools
+import json
 from pathlib import Path
+import shutil
+import sqlite3
+import subprocess
 import sys
+import tempfile
 import types
 import unittest
 
@@ -255,6 +260,224 @@ class MonorepoBilling(unittest.TestCase):
             self.assertNotIn("sub.trial_ends", source)
 
 
+class Approvals(unittest.TestCase):
+    """Held-out fixture: the defenses live in the schema and in one transition function."""
+
+    def setUp(self):
+        self.operations, self.reviews, self.transitions = fixture(
+            "approvals", "operations", "reviews", "transitions")
+        self.conn = self.operations.connect()
+        self.operations.create(self.conn, "r1", "ana")
+
+    def event(self, event_id="e1"):
+        return {"id": event_id, "request_id": "r1", "reviewer": "bob", "verdict": "approved", "at": "t"}
+
+    def test_withdraw_leaves_the_pending_count_behind(self):
+        # The one planted defect: submit adds, decide subtracts, withdraw forgets.
+        self.operations.submit(self.conn, "r1")
+        self.operations.withdraw(self.conn, "r1")
+        self.assertEqual(self.operations.status_of(self.conn, "r1"), "draft")
+        self.assertEqual(self.operations.pending_count(self.conn, "ana"), 1)
+        self.operations.submit(self.conn, "r1")
+        self.assertEqual(self.operations.pending_count(self.conn, "ana"), 2)
+
+    def test_a_failed_event_is_not_remembered(self):
+        # Defended: the marker and the decision share a transaction.
+        with self.assertRaises(self.transitions.StaleRequest):
+            self.reviews.handle_review_event(self.conn, self.event())
+        self.operations.submit(self.conn, "r1")
+        self.assertEqual(self.reviews.handle_review_event(self.conn, self.event()), "applied")
+        self.assertEqual(self.reviews.handle_review_event(self.conn, self.event()), "duplicate")
+        self.assertEqual(self.operations.pending_count(self.conn, "ana"), 0)
+
+    def test_two_writers_cannot_both_decide(self):
+        # Defended: the UPDATE compares the status it expects.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "approvals.db")
+            first = self.operations.connect(path)
+            self.operations.create(first, "r1", "ana")
+            self.operations.submit(first, "r1")
+            second = sqlite3.connect(path)
+            self.operations.decide(first, "r1", "bob", "approved", "t1")
+            with self.assertRaises(self.transitions.StaleRequest):
+                self.operations.decide(second, "r1", "cleo", "rejected", "t2")
+            self.assertEqual(self.operations.status_of(second, "r1"), "approved")
+            first.close()
+            second.close()
+
+    def test_the_schema_refuses_illegal_combinations(self):
+        self.operations.submit(self.conn, "r1")
+        for statement in (
+            "UPDATE requests SET status = 'approved' WHERE id = 'r1'",
+            "UPDATE requests SET decided_by = 'bob', decided_at = 't' WHERE id = 'r1'",
+            "UPDATE requests SET status = 'archived' WHERE id = 'r1'",
+        ):
+            with self.assertRaises(sqlite3.IntegrityError):
+                self.conn.execute(statement)
+
+    def test_a_refused_event_lands_on_the_resubmission(self):
+        # Not planted, but real: rules 3 and 4 together let an approval issued for
+        # one submission be applied to the next one. A report may raise it.
+        self.operations.submit(self.conn, "r1")
+        self.operations.withdraw(self.conn, "r1")
+        with self.assertRaises(self.transitions.StaleRequest):
+            self.reviews.handle_review_event(self.conn, self.event())
+        self.operations.submit(self.conn, "r1")
+        self.assertEqual(self.reviews.handle_review_event(self.conn, self.event()), "applied")
+        self.assertEqual(self.operations.status_of(self.conn, "r1"), "approved")
+
+    def test_connect_cannot_reopen_a_database(self):
+        # Not planted, but real: connect() runs CREATE TABLE on every connection.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "approvals.db")
+            self.operations.connect(path).close()
+            with self.assertRaises(sqlite3.OperationalError):
+                self.operations.connect(path)
+
+    def test_a_decision_and_its_count_are_one_transaction(self):
+        # Defended: if the count cannot be written, the decision is rolled back.
+        self.operations.submit(self.conn, "r1")
+        self.conn.execute("UPDATE authors SET pending_count = 0 WHERE id = 'ana'")
+        self.conn.commit()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.operations.decide(self.conn, "r1", "bob", "approved", "t")
+        self.assertEqual(self.operations.status_of(self.conn, "r1"), "submitted")
+
+
+JOB_LEASES_PROBE = r"""
+const { Store } = require('./store');
+const q = require('./queue');
+const { runOne } = require('./worker');
+const T0 = 1000000;
+const out = {};
+
+(async () => {
+  // Two workers poll at once: both read the queued job before either saves.
+  let store = new Store();
+  await q.enqueue(store, 'a', {});
+  const [first, second] = await Promise.all([q.lease(store, 'w1', T0), q.lease(store, 'w2', T0)]);
+  out.race = { sameJob: first.id === second.id, holders: [first.leasedBy, second.leasedBy] };
+
+  // A retried complete counts the job again, and the lease survives on a done job.
+  store = new Store();
+  let stats = { completed: 0 };
+  await q.enqueue(store, 'a', {});
+  let job = await q.lease(store, 'w1', T0);
+  await q.complete(store, stats, job.id, 'w1', T0 + 1);
+  await q.complete(store, stats, job.id, 'w1', T0 + 2);
+  const done = await store.get(job.id);
+  out.retry = { completed: stats.completed, status: done.status, leasedBy: done.leasedBy };
+
+  // The holder check still passes on a done job, so fail() takes it out of a terminal state.
+  await q.fail(store, job.id, 'w1', T0 + 3, 'late error');
+  out.terminalLeft = (await store.get(job.id)).status;
+
+  // The worker reaches that path by itself when notify fails after complete.
+  store = new Store();
+  stats = { completed: 0 };
+  await q.enqueue(store, 'a', {});
+  let runs = 0;
+  const handler = async () => { runs += 1; };
+  await runOne(store, stats, 'w1', handler, async () => { throw new Error('producer down'); }, () => T0);
+  await runOne(store, stats, 'w1', handler, async () => {}, () => T0);
+  out.worker = { runs, completed: stats.completed };
+
+  // MAX_ATTEMPTS is never enforced: a job that always fails is queued for ever.
+  store = new Store();
+  await q.enqueue(store, 'poison', {});
+  for (let i = 0; i < 10; i += 1) {
+    job = await q.lease(store, 'w1', T0);
+    await q.fail(store, job.id, 'w1', T0 + 1, 'boom');
+  }
+  const poison = (await store.all())[0];
+  out.poison = { status: poison.status, attempts: poison.attempts, max: q.MAX_ATTEMPTS };
+
+  // The counter moves before the completion is stored.
+  store = new Store();
+  stats = { completed: 0 };
+  await q.enqueue(store, 'a', {});
+  job = await q.lease(store, 'w1', T0);
+  const save = store.save.bind(store);
+  store.save = async () => { throw new Error('store down'); };
+  await q.complete(store, stats, job.id, 'w1', T0 + 1).catch(() => {});
+  store.save = save;
+  out.outage = { completed: stats.completed, status: (await store.get(job.id)).status };
+
+  // Not planted, but real: every write is unconditional, so the reaper can undo a completion
+  // that lands between its read and its write.
+  store = new Store();
+  stats = { completed: 0 };
+  await q.enqueue(store, 'a', {});
+  job = await q.lease(store, 'w1', T0);
+  const stale = await store.findExpired(T0 + q.LEASE_MS);
+  await q.complete(store, stats, job.id, 'w1', T0 + q.LEASE_MS - 1);
+  await store.save({ ...stale[0], status: 'queued', leasedBy: null, leaseUntil: null });
+  out.reaperRace = (await store.get(job.id)).status;
+
+  // Defended: keys are unique in the store, and an expired or reaped lease cannot act.
+  store = new Store();
+  const a = await q.enqueue(store, 'k', {});
+  const b = await q.enqueue(store, 'k', {});
+  job = await q.lease(store, 'w1', T0);
+  const expired = await q.complete(store, { completed: 0 }, job.id, 'w1', T0 + q.LEASE_MS).catch((e) => e.constructor.name);
+  await q.reap(store, T0 + q.LEASE_MS);
+  const reaped = await q.complete(store, { completed: 0 }, job.id, 'w1', T0 + 5).catch((e) => e.constructor.name);
+  out.defended = { oneJobPerKey: a.id === b.id, expired, reaped };
+
+  console.log(JSON.stringify(out));
+})();
+"""
+
+
+@unittest.skipUnless(shutil.which("node"), "node is needed to execute the JavaScript fixture")
+class JobLeases(unittest.TestCase):
+    """Held-out fixture in JavaScript: a job queue with leases."""
+
+    @classmethod
+    def setUpClass(cls):
+        done = subprocess.run(["node", "-e", JOB_LEASES_PROBE], cwd=FIXTURES / "job-leases",
+                              capture_output=True, text=True, timeout=60)
+        if done.returncode != 0:
+            raise AssertionError(done.stderr)
+        cls.out = json.loads(done.stdout)
+
+    def test_two_workers_lease_the_same_job(self):
+        self.assertEqual(self.out["race"], {"sameJob": True, "holders": ["w1", "w2"]})
+
+    def test_a_retried_complete_counts_the_job_twice(self):
+        self.assertEqual(self.out["retry"], {"completed": 2, "status": "done", "leasedBy": "w1"})
+
+    def test_a_done_job_returns_to_the_queue(self):
+        self.assertEqual(self.out["terminalLeft"], "queued")
+        self.assertEqual(self.out["worker"], {"runs": 2, "completed": 2})
+
+    def test_a_job_that_always_fails_is_never_dead(self):
+        self.assertEqual(self.out["poison"], {"status": "queued", "attempts": 10, "max": 3})
+        source = (FIXTURES / "job-leases" / "queue.js").read_text(encoding="utf-8")
+        self.assertNotIn("'dead'", source.replace("const STATUS = ['queued', 'leased', 'done', 'dead'];", "")
+                         .replace("const TERMINAL = ['done', 'dead'];", ""))
+
+    def test_a_failed_save_still_counts_the_job(self):
+        self.assertEqual(self.out["outage"], {"completed": 1, "status": "leased"})
+
+    def test_a_stale_reaper_write_undoes_a_completion(self):
+        self.assertEqual(self.out["reaperRace"], "queued")
+        worker = (FIXTURES / "job-leases" / "worker.js").read_text(encoding="utf-8")
+        self.assertNotIn("reap", worker)
+        self.assertNotIn("renew", worker)
+
+    def test_the_defended_paths_hold(self):
+        self.assertEqual(self.out["defended"],
+                         {"oneJobPerKey": True, "expired": "LeaseExpired", "reaped": "NotHolder"})
+
+    def test_the_suite_catches_exactly_the_counter_ordering_defect(self):
+        done = subprocess.run(["node", "--test", "--test-reporter=tap", "queue.test.js"], cwd=FIXTURES / "job-leases",
+                              capture_output=True, text=True, timeout=120)
+        failed = [line.split(" - ", 1)[1] for line in done.stdout.splitlines() if line.startswith("not ok")]
+        self.assertEqual(failed, ["a store outage during complete does not count the job"])
+        self.assertIn("# tests 11", done.stdout)
+
+
 class FixtureSuites(unittest.TestCase):
     """The test suites planted in fixtures, which the test-audit phase reads."""
 
@@ -301,6 +524,15 @@ class FixtureSuites(unittest.TestCase):
     def test_clean_ticket_suite_is_green(self):
         result = self.run_suite("clean-ticket", "test_tickets")
         self.assertTrue(result.wasSuccessful(), result.failures + result.errors)
+
+    def test_approvals_suite_is_green(self):
+        # Green, and strong where it matters; it never checks the count after a withdrawal.
+        result = self.run_suite("approvals", "test_approvals")
+        self.assertTrue(result.wasSuccessful(), result.failures + result.errors)
+        self.assertEqual(result.testsRun, 11)
+        source = (FIXTURES / "approvals" / "test_approvals.py").read_text(encoding="utf-8")
+        withdrawal = source.split("def test_withdrawing_returns_the_request_to_draft")[1]
+        self.assertNotIn("pending_count", withdrawal)
 
 
 if __name__ == "__main__":

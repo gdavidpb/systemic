@@ -3,6 +3,8 @@
 
 Usage:
     python3 systemic_check.py <G0|G1|G2|G3|G4|G5|G6|G7|all> <run-dir> [--project-root DIR]
+    python3 systemic_check.py hash <run-dir> [path ...]     entries for sources.json (F1)
+    python3 systemic_check.py counts <run-dir> [--write]    tests.json.by_category (F5)
 
 <run-dir> is the workspace a run writes, normally <project>/systemic-out/<slug>/.
 The project root defaults to two levels above it. Exit codes: 0 when the gate
@@ -36,6 +38,8 @@ VERDICTS = {"findings", "clean", "not_verifiable"}
 REPORT_VERDICTS = {"findings": "findings", "clean": "clean", "not_verifiable": "not verifiable"}
 CELLS = {"defined", "guarded", "hole"}
 CONFIDENCE = {"high", "medium", "low"}
+EXECUTION = {"read_only", "allowed"}
+VERIFICATION = {"independent", "self"}
 REAUDIT = {"persisting", "resolved", "not_verified"}
 ROLES = {"source", "test"}
 CATEGORIES = ["state", "transition", "logical", "temporal", "repetition", "concurrency", "atomicity", "algebraic"]
@@ -54,21 +58,47 @@ TECHNIQUE_FIT = {
     "algebraic": {"metamorphic", "property"},
 }
 SUITE_STATUS = {"in_scope", "absent", "out_of_scope"}
-# Techniques whose label must be visible in the test body. A test labeled with
-# one of these and showing none of its markers is relabeled by the auditor.
+# Techniques whose label must be visible in the code of the test: its body and
+# decorators, with comments, string literals and its own name removed. A word in a test name, a docstring or a comment proves nothing
+# about what the test does. references/run-contracts.md lists the same markers;
+# evals/test_systemic_check.py fails when the two drift apart.
 TECHNIQUE_MARKERS = {
-    "concurrency": ("Barrier", "Event(", "Latch", "Semaphore", "Thread(", "threading.", "asyncio.gather",
-                    "gather(", "Promise.all", "go func", "WaitGroup", "interleav", "yield_now"),
-    "fault_injection": ("side_effect", "raise ", "throw ", "raises", "Raises", "fail", "Error(", "Exception(",
-                        "mock.patch", "patch(", "monkeypatch", "inject"),
-    "property": ("@given", "hypothesis", "fc.assert", "fc.property", "forall", "for ", "subTest", "product(",
-                 "parametrize", "quickcheck", "proptest", "each(", "range("),
+    # A primitive that forces two operations to overlap.
+    "concurrency": ("Barrier", "Event(", "Latch", "Semaphore", "Thread(", "threading.", "gather(",
+                    "Promise.all", "Promise.race", "go func", "WaitGroup", "errgroup", "spawn("),
+    # A dependency made to fail. Expecting an exception (assertRaises, raises,
+    # toThrow, rejects) is an assertion, not an injected fault.
+    "fault_injection": ("side_effect", "patch(", "patch.object(", "monkeypatch", "mockRejectedValue",
+                        "mockImplementation", "mock.method(", "Promise.reject(", "thenThrow(", "doThrow(",
+                        "errors.New(", "fmt.Errorf("),
+    # A generator, a parametrization or a loop over a domain.
+    "property": ("@given", "hypothesis", "fc.assert", "fc.property", "forall", "subTest", "product(",
+                 "parametrize", "quickcheck", "proptest", ".each(", "range(", ".forEach("),
 }
-TEST_START = re.compile(r"^(\s*)(?:async\s+)?(?:def |class |func Test|it\(|test\(|describe\(|@Test|fn )")
+# Markers that are statements rather than names: matched as whole words.
+TECHNIQUE_PATTERNS = {
+    "fault_injection": re.compile(r"\b(?:raise|throw)\b"),
+    "property": re.compile(r"\bfor\b"),
+}
+DEFINED_NAME = re.compile(r"\b(?:def|func|fn|class|void)\s+\w+")
+REPETITION_LOOP = re.compile(r"\bfor\b|\bwhile\b|range\(|\.times\b|repeat")
+TEST_START = re.compile(
+    r"^(\s*)(?:async\s+)?(?:def |class |func Test|t\.Run\(|(?:it|test|describe)(?:\.\w+)*\(|@Test|fn )")
+HASH_COMMENT_SUFFIXES = {".py", ".rb", ".sh", ".pl", ".yml", ".yaml", ".toml", ".ex", ".exs"}
+_STRINGS = r"\'\'\'[\s\S]*?\'\'\'|\"\"\"[\s\S]*?\"\"\"|\"(?:\\.|[^\"\\\n])*\"|\'(?:\\.|[^\'\\\n])*\'"
+STRIP_HASH = re.compile(_STRINGS + r"|#[^\n]*")
+STRIP_SLASH = re.compile(_STRINGS + r"|`(?:\\.|[^`\\])*`|//[^\n]*|/\*[\s\S]*?\*/")
+
+
+def code_only(text, path=""):
+    """Remove comments and string literals, by the comment syntax of the file's language."""
+    hash_style = PurePosixPath(str(path)).suffix.lower() in HASH_COMMENT_SUFFIXES
+    return (STRIP_HASH if hash_style else STRIP_SLASH).sub(
+        lambda m: "" if m.group(0)[0] in "#/" else '""', text)
 
 
 def test_body(ctx, cite):
-    """The text of the test whose definition is cited, up to the next sibling definition."""
+    """The definition that encloses the cited line, with its decorators, up to the next sibling."""
     loaded = ctx.source_lines(cite.get("file")) if isinstance(cite, dict) else None
     line = cite.get("line") if isinstance(cite, dict) else None
     if loaded is None or not isinstance(line, int) or not 1 <= line <= len(loaded[1]):
@@ -84,13 +114,44 @@ def test_body(ctx, cite):
             break
     head = TEST_START.match(lines[start])
     indent = len(head.group(1)) if head else len(lines[start]) - len(lines[start].lstrip())
-    body = [lines[start]]
+    body = []
     for text in lines[start + 1:start + 120]:
         match = TEST_START.match(text)
         if match and len(match.group(1)) <= indent:
             break
         body.append(text)
-    return "\n".join(body)
+    # Decorators sit above the definition: @given, @patch, @pytest.mark.parametrize.
+    decorators = []
+    for back in range(start - 1, max(-1, start - 30), -1):
+        text = lines[back]
+        own = len(text) - len(text.lstrip())
+        stripped = text.strip()
+        if not stripped or own < indent or (own == indent and not stripped.startswith(("@", ")", "]"))):
+            break
+        decorators.insert(0, text)
+    if decorators and not decorators[0].strip().startswith("@"):
+        decorators = []
+    return "\n".join(decorators + [lines[start]] + body)
+
+
+def technique_code(ctx, cite):
+    """The code a technique label is judged on: the test without what it is called."""
+    text = test_body(ctx, cite)
+    if text is None:
+        return None
+    path = cite.get("file") if isinstance(cite, dict) else ""
+    # A JavaScript test is named by a string, which code_only removes; elsewhere
+    # the name is the identifier after the keyword.
+    return DEFINED_NAME.sub("", code_only(text, path))
+
+
+def shows_technique(technique, code):
+    if any(marker in code for marker in TECHNIQUE_MARKERS.get(technique, ())):
+        return True
+    pattern = TECHNIQUE_PATTERNS.get(technique)
+    return bool(pattern and pattern.search(code))
+
+
 GAP_STATUS = {"detected", "undetected", "enshrined", "not_assessed"}
 FORBIDDEN_DIRS = {"node_modules", "vendor", ".git", "fixtures", "site-packages", ".venv", "venv"}
 FILLER = {"ok", "n/a", "na", "none", "-", "todo", "tbd", "yes", "no", "done", "checked", "fine", "verified"}
@@ -283,6 +344,15 @@ def g0(ctx):
         e.append(f"G0 run.json.phase: must be F0..{FINAL_PHASE}")
     if run.get("graph_informed", False) not in {True, False}:
         e.append("G0 run.json.graph_informed: must be true or false")
+    execution = run.get("execution", "read_only")
+    if execution not in EXECUTION:
+        e.append("G0 run.json.execution: must be read_only or allowed")
+    if "execution" in run and run.get("execution_source") not in {"explicit", "default"}:
+        e.append("G0 run.json.execution_source: must be explicit or default")
+    if execution == "allowed" and run.get("execution_source") != "explicit":
+        e.append("G0 run.json.execution: allowed requires execution_source 'explicit' (the user asked for it)")
+    if execution != "allowed" and (ctx.run_dir / "traces").exists():
+        e.append("G0 traces/: scripts that execute the code exist, but run.json.execution is not allowed")
     if run.get("validation") not in {"script", "manual"}:
         e.append("G0 run.json.validation: must be script or manual")
     if not ctx.source_root.is_dir():
@@ -471,8 +541,23 @@ def g2(ctx):
                 e.append(f"G2 {where}.claims: unknown claim {ref}")
             linked.add(ref)
         check_cites(ctx, div.get("evidence"), f"{where}.evidence", e, "G2")
-    for claim in sorted(claims - linked):
-        e.append(f"G2 model.json: claim {claim} is neither satisfied nor linked to a divergence")
+    unverified = set()
+    for i, entry in enumerate(model.get("claims_unverified") or []):
+        where = f"model.json.claims_unverified[{i}]"
+        ref = entry.get("claim") if isinstance(entry, dict) else None
+        if ref not in claims:
+            e.append(f"G2 {where}.claim: unknown claim {ref!r}")
+            continue
+        if ref in linked:
+            e.append(f"G2 {where}.claim: {ref} is already satisfied or linked to a divergence; "
+                     f"a claim the scope cannot settle is neither")
+        if ref in unverified:
+            e.append(f"G2 {where}.claim: {ref} is listed twice")
+        unverified.add(ref)
+        need_text(entry, "reason", where, e, "G2")
+    for claim in sorted(claims - linked - unverified):
+        e.append(f"G2 model.json: claim {claim} is neither satisfied, linked to a divergence "
+                 f"nor recorded in claims_unverified with what is missing")
     machine_ids = set(ids(model.get("machines"), "M-"))
     invariants = model.get("invariants")
     if not isinstance(invariants, list):
@@ -585,6 +670,9 @@ def g3(ctx):
         for op in ops:
             if op not in operators:
                 e.append(f"G3 {where}.operators: unknown operator {op}")
+        movers = {tr.get("operator") for tr in machine.get("transitions") or [] if isinstance(tr, dict)}
+        for op in sorted(o for o in movers - set(ops) if isinstance(o, str) and o in operators):
+            e.append(f"G3 {where}.operators: {op} performs a transition of {matrix['machine']} and needs a column")
         rows = matrix.get("rows") or {}
         notes = matrix.get("notes") or {}
         for state in machine.get("states") or []:
@@ -661,6 +749,8 @@ def g4(ctx):
             e.append(f"G4 {where}.confidence.level: must be high, medium or low")
         need_text(confidence, "basis", f"{where}.confidence", e, "G4")
         check_cites(ctx, finding.get("evidence"), f"{where}.evidence", e, "G4", need_quote=True)
+        if finding.get("verification", "self") not in VERIFICATION:
+            e.append(f"G4 {where}.verification: must be independent or self")
     for i, rejected in enumerate(data.get("rejected") or []):
         where = f"findings.json.rejected[{i}]"
         assign(rejected.get("candidate"), f"{where}.candidate")
@@ -707,7 +797,7 @@ def g4(ctx):
             unjustified = [i for i, f in group if not substantive(f.get("separate_because"))]
             if len(unjustified) > 1:
                 e.append(f"G4 findings.json.confirmed{unjustified}: check-3 findings on machine {mid} are one "
-                         f"finding unless each later one states separate_because")
+                         f"finding unless each later one states separate_because (references/dedup.md)")
     need_log(ctx, "G4", e)
     return e
 
@@ -810,18 +900,26 @@ def g5(ctx):
             e.append(f"G5 {where}.name: required")
         if test.get("technique") not in TECHNIQUES:
             e.append(f"G5 {where}.technique: must be one of {sorted(TECHNIQUES)}")
-        markers = TECHNIQUE_MARKERS.get(test.get("technique"))
+        technique = test.get("technique")
         cites = test.get("evidence") if isinstance(test.get("evidence"), list) else []
-        if markers and cites:
-            body = test_body(ctx, cites[0])
-            if body is not None and not any(m in body for m in markers):
-                e.append(f"G5 {where}.technique: nothing in the body of {test.get('name')!r} shows "
-                         f"{test.get('technique')} (expected one of {list(markers)[:4]}…); classify it by what it does")
-        if test.get("technique") == "repetition" and cites:
-            body = test_body(ctx, cites[0])
-            calls = re.findall(r"([A-Za-z_][\w.]*)\(", body or "")
+        code = technique_code(ctx, cites[0]) if cites else None
+        # The mechanism may live in a helper the test uses (a fake that raises,
+        # a fixture that starts the threads): technique_evidence cites it.
+        helper = test.get("technique_evidence")
+        if helper is not None:
+            cite_in_tests(helper, f"{where}.technique_evidence")
+            for cite in helper if isinstance(helper, list) else []:
+                extra = technique_code(ctx, cite)
+                if extra is not None and code is not None:
+                    code += "\n" + extra
+        if technique in TECHNIQUE_MARKERS and code is not None and not shows_technique(technique, code):
+            e.append(f"G5 {where}.technique: nothing in the code of {test.get('name')!r} shows {technique} "
+                     f"(expected one of {list(TECHNIQUE_MARKERS[technique])[:4]}…; names, comments and strings "
+                     f"do not count); classify it by what it does, or cite the helper in technique_evidence")
+        if technique == "repetition" and code is not None:
+            calls = re.findall(r"([A-Za-z_][\w.]*)\(", code)
             repeated = {c for c in calls if calls.count(c) > 1 and not c.startswith(("self.assert", "assert", "expect"))}
-            if body is not None and not repeated and not re.search(r"\bfor\b|range\(|times|repeat|twice|again", body):
+            if not repeated and not REPETITION_LOOP.search(code):
                 e.append(f"G5 {where}.technique: {test.get('name')!r} never applies an operation twice; "
                          f"it is not a repetition test")
         for ref in test.get("operators") or []:
@@ -935,7 +1033,8 @@ def g5(ctx):
 
     expected = coverage_counts(ctx)
     if data.get("by_category") != expected:
-        e.append(f"G5 tests.json.by_category: must be {json.dumps(expected, sort_keys=False)}")
+        e.append(f"G5 tests.json.by_category: must be {json.dumps(expected, sort_keys=False)} "
+                 f"(run 'systemic_check.py counts <run-dir> --write' instead of counting by hand)")
     need_log(ctx, "G5", e)
     return e
 
@@ -1158,26 +1257,94 @@ def run_all(ctx):
     return errors
 
 
+SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "site-packages", "systemic-out"}
+USAGE = """usage: systemic_check.py <G0..G7|all> <run-dir> [--project-root DIR]
+       systemic_check.py hash <run-dir> [path ...] [--project-root DIR]
+       systemic_check.py counts <run-dir> [--write]"""
+
+
+def hash_entries(ctx, paths):
+    """sources.json entries (path, sha256, lines) for every file under the paths.
+
+    Paths are relative to source_root, like run.json.targets. The numbers are
+    the ones G1 recomputes, so F1 copies them instead of deriving them.
+    """
+    entries, missing = [], []
+    for target in paths:
+        base = ctx.source_root / target
+        if base.is_file():
+            found = [base]
+        elif base.is_dir():
+            found = sorted(f for f in base.rglob("*")
+                           if f.is_file() and not SKIP_DIRS & set(f.relative_to(ctx.source_root).parts)
+                           and f.suffix not in {".pyc", ".pyo"})
+        else:
+            missing.append(target)
+            continue
+        for file in found:
+            rel = PurePosixPath(file.relative_to(ctx.source_root).as_posix())
+            digest, lines = ctx.source_lines(str(rel))
+            entry = {"path": str(rel), "sha256": digest, "lines": len(lines)}
+            if entry not in entries:
+                entries.append(entry)
+    return entries, missing
+
+
+def run_hash(ctx, paths):
+    targets = paths or [t for t in ctx.run.get("targets") or [] if isinstance(t, str)]
+    if not targets:
+        print("ERROR run.json.targets is empty; pass the paths to hash")
+        return 2
+    entries, missing = hash_entries(ctx, targets)
+    print(json.dumps(entries, indent=2, ensure_ascii=False))
+    for target in missing:
+        print(f"ERROR {target} does not exist under {ctx.source_root}", file=sys.stderr)
+    return 2 if missing else 0
+
+
+def run_counts(ctx, write):
+    for name in ("model.json", "tests.json"):
+        if not isinstance(ctx.load(name), dict):
+            print(f"ERROR {name} not found in {ctx.run_dir}; counts needs the invariant catalog and the coverage")
+            return 2
+    counts = coverage_counts(ctx)
+    if write:
+        data = ctx.load("tests.json")
+        data["by_category"] = counts
+        (ctx.run_dir / "tests.json").write_text(
+            json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(json.dumps(counts, sort_keys=False))
+    return 0
+
+
 def main(argv):
     args = list(argv)
     root = None
     if "--project-root" in args:
         i = args.index("--project-root")
         if i + 1 >= len(args):
-            print("usage: systemic_check.py <G0..G7|all> <run-dir> [--project-root DIR]")
+            print(USAGE)
             return 2
         root = Path(args[i + 1])
         del args[i:i + 2]
-    if len(args) != 2 or (args[0] not in GATES and args[0] != "all"):
-        print("usage: systemic_check.py <G0..G7|all> <run-dir> [--project-root DIR]")
+    write = "--write" in args
+    args = [a for a in args if a != "--write"]
+    command = args[0] if args else None
+    known = command in GATES or command in {"all", "hash", "counts"}
+    if not known or len(args) < 2 or (command != "hash" and len(args) != 2) or (write and command != "counts"):
+        print(USAGE)
         return 2
-    gate, run_dir = args[0], Path(args[1]).resolve()
+    gate, run_dir = command, Path(args[1]).resolve()
     if not run_dir.is_dir():
         print(f"ERROR {run_dir} is not a directory")
         return 2
     project_root = (root or run_dir.parent.parent).resolve()
     try:
         ctx = Ctx(run_dir, project_root)
+        if gate == "hash":
+            return run_hash(ctx, args[2:])
+        if gate == "counts":
+            return run_counts(ctx, write)
         errors = run_all(ctx) if gate == "all" else GATES[gate](ctx)
     except Unreadable as exc:
         print(f"ERROR {exc}")

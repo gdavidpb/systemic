@@ -73,7 +73,7 @@ Read the test, not its name. Classify by what the test body does:
 | `stateful` | Generated sequences of operations against a model (`RuleBasedStateMachine`, model-based testing) |
 | `repetition` | The same operation or event applied twice or more, including a retry after a failed first attempt and a delayed replay |
 | `concurrency` | Threads, tasks or transactions forced to interleave (barriers, latches, two sessions on the same row) |
-| `fault_injection` | A dependency made to fail between two writes (a mock that raises, a killed connection), then assertions on what remains |
+| `fault_injection` | A dependency made to fail between two writes (a mock that raises, a killed connection), then assertions on what remains. A test that only expects an operator to refuse (`assertRaises` around a guard) injects nothing: it is `example` |
 | `metamorphic` | Two compositions of operators compared with each other rather than with a fixed value |
 
 ## Coverage levels
@@ -98,9 +98,13 @@ Each invariant gets exactly one level:
 - **uncovered** — no test touches it. Say what you searched for.
 - **not_verifiable** — the tests are outside the scope or could not be read.
 
-Never run the suite. A green suite proves the assertions hold, not that they
-assert the invariants; a red suite proves nothing about which invariant
-broke. Read the assertions.
+Do not run the suite: by default the skill executes nothing. A green suite
+proves the assertions hold, not that they assert the invariants; a red suite
+proves nothing about which invariant broke. Read the assertions. When the
+user allowed execution (`run.json.execution: allowed`), running a test can
+confirm what reading concluded — that a `detected` test is red, or that an
+`asserted` one turns red when the invariant is broken in a copy — but the
+level is still decided from the assertion; see `references/execution.md`.
 
 ## Traps that look like coverage
 

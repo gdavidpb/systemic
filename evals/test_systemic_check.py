@@ -51,9 +51,12 @@ class Workspace:
         self.write(name, data)
 
     def check(self, gate="all"):
+        return self.check_raw([gate, str(self.run_dir)])
+
+    def check_raw(self, argv):
         out = io.StringIO()
         with redirect_stdout(out):
-            code = checker.main([gate, str(self.run_dir)])
+            code = checker.main(argv)
         return code, out.getvalue()
 
     def close(self):
@@ -188,6 +191,61 @@ class G1Sources(GateTestCase):
         self.assertFails("G2", "outside the ranges recorded as read")
 
 
+class Execution(GateTestCase):
+    """The code under analysis is not executed unless the user allowed it."""
+
+    def test_a_run_without_the_field_is_read_only(self):
+        self.assertNotIn("execution", self.ws.read("run.json"))
+        code, out = self.ws.check("G0")
+        self.assertEqual(code, 0, out)
+
+    def test_allowed_needs_the_user_to_have_asked(self):
+        self.ws.edit("run.json", lambda d: d.update(execution="allowed", execution_source="default"))
+        self.assertFails("G0", "allowed requires execution_source 'explicit'")
+
+    def test_allowed_and_explicit_is_accepted(self):
+        self.ws.edit("run.json", lambda d: d.update(execution="allowed", execution_source="explicit"))
+        (self.ws.run_dir / "traces").mkdir()
+        code, out = self.ws.check("all")
+        self.assertEqual(code, 0, out)
+
+    def test_unknown_value(self):
+        self.ws.edit("run.json", lambda d: d.update(execution="sandboxed", execution_source="explicit"))
+        self.assertFails("G0", "must be read_only or allowed")
+
+    def test_trace_scripts_need_execution_to_be_allowed(self):
+        (self.ws.run_dir / "traces").mkdir()
+        self.assertFails("G0", "run.json.execution is not allowed")
+
+
+class HashHelper(GateTestCase):
+    def test_hash_reproduces_the_recorded_sources(self):
+        code, out = self.ws.check_raw(["hash", str(self.ws.run_dir)])
+        self.assertEqual(code, 0, out)
+        printed = {e["path"]: (e["sha256"], e["lines"]) for e in json.loads(out)}
+        recorded = {e["path"]: (e["sha256"], e["lines"]) for e in self.ws.read("sources.json")["files"]}
+        self.assertEqual(printed, recorded)
+
+    def test_hash_counts_a_last_line_without_a_newline(self):
+        (self.ws.sources / "notes.txt").write_text("one\ntwo", encoding="utf-8")
+        code, out = self.ws.check_raw(["hash", str(self.ws.run_dir), "notes.txt"])
+        self.assertEqual(json.loads(out)[0]["lines"], 2)
+
+    def test_hash_walks_a_directory_and_skips_caches(self):
+        cache = self.ws.sources / "__pycache__"
+        cache.mkdir(exist_ok=True)
+        (cache / "models.cpython-313.pyc").write_bytes(b"\x00")
+        code, out = self.ws.check_raw(["hash", str(self.ws.run_dir), "."])
+        self.assertEqual(code, 0, out)
+        paths = [e["path"] for e in json.loads(out)]
+        self.assertIn("operations.py", paths)
+        self.assertFalse([p for p in paths if "__pycache__" in p], paths)
+
+    def test_hash_reports_a_missing_path(self):
+        code, _ = self.ws.check_raw(["hash", str(self.ws.run_dir), "gone.py"])
+        self.assertEqual(code, 2)
+
+
 class G2Model(GateTestCase):
     def test_transition_must_use_a_modeled_operator(self):
         self.ws.edit("model.json", lambda d: d["machines"][0]["transitions"][0].update(operator="O-99"))
@@ -215,6 +273,42 @@ class G2Model(GateTestCase):
     def test_declared_invariant_names_its_claims(self):
         self.ws.edit("model.json", lambda d: d["invariants"][1].update(claims=[]))
         self.assertFails("G2", "names the claims that declare it")
+
+
+class UnverifiedClaims(GateTestCase):
+    """A claim the material in scope cannot settle is recorded as such, with what is missing."""
+
+    def _unlink(self, d):
+        claim = d["claims_satisfied"].pop()
+        return claim
+
+    def test_a_claim_needs_one_of_three_places(self):
+        self.ws.edit("model.json", self._unlink)
+        self.assertFails("G2", "nor recorded in claims_unverified")
+
+    def test_unverified_with_what_is_missing_is_accepted(self):
+        def move(d):
+            claim = self._unlink(d)
+            d["claims_unverified"] = [{"claim": claim, "reason": "The service that enforces it is outside the scope"}]
+        self.ws.edit("model.json", move)
+        code, out = self.ws.check("G2")
+        self.assertEqual(code, 0, out)
+
+    def test_unverified_needs_a_reason(self):
+        def move(d):
+            d["claims_unverified"] = [{"claim": self._unlink(d), "reason": "n/a"}]
+        self.ws.edit("model.json", move)
+        self.assertFails("G2", "claims_unverified[0].reason")
+
+    def test_a_settled_claim_is_not_unverified(self):
+        self.ws.edit("model.json", lambda d: d.update(
+            claims_unverified=[{"claim": d["claims_satisfied"][0], "reason": "Recorded twice by mistake here"}]))
+        self.assertFails("G2", "already satisfied or linked to a divergence")
+
+    def test_unknown_claim(self):
+        self.ws.edit("model.json", lambda d: d.update(
+            claims_unverified=[{"claim": "D-99", "reason": "No such claim was recorded in F1"}]))
+        self.assertFails("G2", "unknown claim 'D-99'")
 
 
 class G5Tests(GateTestCase):
@@ -313,11 +407,70 @@ class G5Tests(GateTestCase):
         self.ws.edit("tests.json", lambda d: d["tests"][5].update(technique="repetition"))
         self.assertFails("G5", "never applies an operation twice")
 
+    def test_expecting_an_exception_is_not_fault_injection(self):
+        # X-4 is a guard test: `with self.assertRaises(ValueError)`. It expects a
+        # refusal; nothing is made to fail, so it cannot defend an atomicity rule.
+        self.ws.edit("tests.json", lambda d: d["tests"][3].update(technique="fault_injection"))
+        self.assertFails("G5", "shows fault_injection")
+
     def test_technique_is_read_from_the_enclosing_test(self):
         # Citing a line inside the test, not its def, still finds the whole body.
         self.ws.edit("tests.json", lambda d: d["tests"][3].update(
             technique="fault_injection",
             evidence=[{"file": "test_orders.py", "line": 56, "quote": "deliver(order)"}]))
+        self.assertFails("G5", "'test_deliver_rejects_an_unshipped_order' shows fault_injection")
+
+    def _add_courier_failure_test(self, technique_evidence):
+        """Append a fake that raises and a test that uses it, then record the test."""
+        path = self.ws.sources / "test_orders.py"
+        text = path.read_text(encoding="utf-8")
+        helper_line = len(text.splitlines()) + 3
+        path.write_text(text + (
+            "\n\nclass DownCourier:\n"
+            "    def notify(self, order_id):\n"
+            "        raise ConnectionError(order_id)\n"
+            "\n\nclass ShippingFailureTest(unittest.TestCase):\n"
+            "    def test_courier_outage_leaves_the_order_paid(self):\n"
+            "        order = placed_order()\n"
+            "        mark_paid(order)\n"
+            "        with self.assertRaises(ConnectionError):\n"
+            "            ship(order, FakeInventory(), DownCourier())\n"
+            "        self.assertEqual(order.status, \"paid\")\n"), encoding="utf-8")
+        code, out = self.ws.check_raw(["hash", str(self.ws.run_dir), "test_orders.py"])
+        self.assertEqual(code, 0, out)
+        fresh = json.loads(out)[0]
+
+        def refresh(d):
+            for entry in d["files"]:
+                if entry["path"] == "test_orders.py":
+                    entry.update(sha256=fresh["sha256"], lines=fresh["lines"])
+        self.ws.edit("sources.json", refresh)
+        test = {"id": "X-7", "name": "test_courier_outage_leaves_the_order_paid", "technique": "fault_injection",
+                "operators": [], "evidence": [{"file": "test_orders.py", "line": helper_line + 6,
+                                               "quote": "def test_courier_outage_leaves_the_order_paid(self):"}]}
+        if technique_evidence:
+            test["technique_evidence"] = [{"file": "test_orders.py", "line": helper_line + 1,
+                                           "quote": "raise ConnectionError(order_id)"}]
+        self.ws.edit("tests.json", lambda d: d["tests"].append(test))
+
+    def test_fault_in_a_helper_needs_the_helper_cited(self):
+        self._add_courier_failure_test(technique_evidence=False)
+        self.assertFails("G5", "cite the helper in technique_evidence", run="G5")
+
+    def test_fault_in_a_cited_helper_is_accepted(self):
+        self._add_courier_failure_test(technique_evidence=True)
+        code, out = self.ws.check("G5")
+        self.assertEqual(code, 0, out)
+
+    def test_counts_writes_by_category(self):
+        self.ws.edit("tests.json", lambda d: d.update(by_category={}))
+        self.assertFails("G5", "by_category: must be", run="G5")
+        code, out = self.ws.check_raw(["counts", str(self.ws.run_dir)])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.ws.read("tests.json")["by_category"], {})
+        code, out = self.ws.check_raw(["counts", str(self.ws.run_dir), "--write"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.ws.read("tests.json")["by_category"], json.loads(out))
         code, out = self.ws.check("G5")
         self.assertEqual(code, 0, out)
 
@@ -330,6 +483,17 @@ class G3Checks(GateTestCase):
     def test_all_twelve_checks_are_recorded(self):
         self.ws.edit("checks.json", lambda d: d["checks"].pop(6))
         self.assertFails("G3", "ids 1..12 exactly once")
+
+    def test_a_matrix_has_a_column_for_every_operator_that_moves_the_machine(self):
+        def drop(d):
+            matrix = d["matrices"][0]
+            index = len(matrix["operators"]) - 1
+            matrix["operators"].pop(index)
+            for state, row in matrix["rows"].items():
+                row.pop(index)
+        self.ws.edit("checks.json", drop)
+        code, out = self.ws.check("G3")
+        self.assertIn("performs a transition of M-1 and needs a column", out)
 
     def test_clean_needs_substantive_evidence(self):
         self.ws.edit("checks.json", lambda d: d["checks"][11].update(verified="ok"))
@@ -389,6 +553,13 @@ class G4Findings(GateTestCase):
     def test_duplicate_fingerprint(self):
         self.ws.edit("findings.json", lambda d: d["confirmed"][1].update(fingerprint=d["confirmed"][0]["fingerprint"]))
         self.assertFails("G4", "duplicate")
+
+    def test_verification_is_independent_or_self(self):
+        self.ws.edit("findings.json", lambda d: d["confirmed"][0].update(verification="independent"))
+        code, out = self.ws.check("G4")
+        self.assertEqual(code, 0, out)
+        self.ws.edit("findings.json", lambda d: d["confirmed"][0].update(verification="peer reviewed"))
+        self.assertFails("G4", "verification: must be independent or self")
 
     def test_finding_states_what_impact_is_not_verified(self):
         self.ws.edit("findings.json", lambda d: d["confirmed"][0]["impact"].update(not_verified=None))
@@ -595,6 +766,215 @@ class InterruptedRun(unittest.TestCase):
         lines = out.getvalue().splitlines()
         self.assertTrue(any(l.startswith("G1 ") and "sha256 does not match operations.py" in l for l in lines), lines)
         self.assertFalse(any(l.startswith(("G5", "G6", "G7")) for l in lines), lines)
+
+
+class FakeSources:
+    """Just enough of the validator's context to read one test file."""
+
+    def __init__(self, text):
+        self.lines = text.splitlines()
+
+    def source_lines(self, rel):
+        return "digest", self.lines
+
+
+class TechniqueMarkers(unittest.TestCase):
+    """A technique label is judged on what the test does, in any language.
+
+    The label decides whether a repetition, concurrency, atomicity, temporal or
+    algebraic invariant counts as asserted, so a loose match inflates the
+    coverage table. Names, comments and strings are not evidence.
+    """
+
+    def shows(self, technique, file, text, marker_line):
+        lines = text.splitlines()
+        line = next(i for i, row in enumerate(lines, 1) if marker_line in row)
+        code = checker.technique_code(FakeSources(text), {"file": file, "line": line})
+        self.assertIsNotNone(code)
+        return checker.shows_technique(technique, code)
+
+    PY_GUARD = (
+        "class T(unittest.TestCase):\n"
+        "    def test_cancel_fails_when_shipped(self):\n"
+        "        order = make_order(status='shipped')\n"
+        "        with self.assertRaises(ValueError):\n"
+        "            cancel(order)\n"
+        "\n"
+        "    def test_other(self):\n"
+        "        payments.charge.side_effect = Declined('no')\n"
+    )
+
+    def test_python_guard_test_is_not_fault_injection(self):
+        self.assertFalse(self.shows("fault_injection", "test_x.py", self.PY_GUARD, "def test_cancel_fails"))
+
+    def test_python_side_effect_is_fault_injection(self):
+        self.assertTrue(self.shows("fault_injection", "test_x.py", self.PY_GUARD, "def test_other"))
+
+    def test_the_body_stops_at_the_next_test(self):
+        # test_other's side_effect must not leak into the test above it.
+        self.assertFalse(self.shows("fault_injection", "test_x.py", self.PY_GUARD, "cancel(order)"))
+
+    def test_words_in_comments_strings_and_names_do_not_count(self):
+        text = (
+            "def test_for_each_state_with_threading(self):\n"
+            "    \"\"\"Checks the total for every order.\"\"\"\n"
+            "    # wait for the barrier; see threading.md and Promise.all\n"
+            "    self.assertEqual(order.total, 30, 'for the record: raise on failure')\n"
+        )
+        for technique in ("property", "concurrency", "fault_injection"):
+            self.assertFalse(self.shows(technique, "test_x.py", text, "def test_for_each"), technique)
+
+    def test_a_comprehension_over_a_domain_is_a_property(self):
+        text = "def test_every_state_has_an_exit(self):\n    self.assertTrue(all(exits(s) for s in STATES))\n"
+        self.assertTrue(self.shows("property", "test_x.py", text, "def test_every"))
+
+    def test_decorators_belong_to_the_test(self):
+        text = (
+            "@given(st.integers(min_value=0))\n"
+            "def test_total_never_negative(n):\n"
+            "    assert total(n) >= 0\n"
+            "\n"
+            "@pytest.mark.parametrize(\n"
+            "    'state', ['draft', 'shipped'],\n"
+            ")\n"
+            "def test_cancel(state):\n"
+            "    assert cancel(state)\n"
+            "\n"
+            "def test_plain():\n"
+            "    assert total(1) == 1\n"
+        )
+        self.assertTrue(self.shows("property", "test_x.py", text, "def test_total_never_negative"))
+        self.assertTrue(self.shows("property", "test_x.py", text, "def test_cancel"))
+        self.assertFalse(self.shows("property", "test_x.py", text, "def test_plain"))
+
+    JS = (
+        "test('two workers lease one job', async () => {\n"
+        "  const [a, b] = await Promise.all([lease(q, 'w1'), lease(q, 'w2')]);\n"
+        "  assert.notEqual(a, b);\n"
+        "});\n"
+        "\n"
+        "test('leases one after the other', async () => {\n"
+        "  // not Promise.all: the second call starts after the first resolves\n"
+        "  const a = await lease(q, 'w1');\n"
+        "  await assert.rejects(() => lease(q, 'w2'));\n"
+        "});\n"
+        "\n"
+        "it('keeps the job leased when the store is down', async () => {\n"
+        "  mock.method(store, 'save', async () => { throw new Error('down'); });\n"
+        "  await assert.rejects(() => complete(q, job));\n"
+        "});\n"
+        "\n"
+        "it.each([['queued'], ['done']])('refuses %s', (state) => {\n"
+        "  assert.throws(() => complete(make(state)));\n"
+        "});\n"
+    )
+
+    def test_javascript_overlap_is_concurrency(self):
+        self.assertTrue(self.shows("concurrency", "queue.test.js", self.JS, "two workers lease one job"))
+
+    def test_javascript_sequence_is_not_concurrency(self):
+        self.assertFalse(self.shows("concurrency", "queue.test.js", self.JS, "leases one after the other"))
+
+    def test_javascript_expected_rejection_is_not_fault_injection(self):
+        self.assertFalse(self.shows("fault_injection", "queue.test.js", self.JS, "leases one after the other"))
+
+    def test_javascript_failing_dependency_is_fault_injection(self):
+        self.assertTrue(self.shows("fault_injection", "queue.test.js", self.JS, "store is down"))
+
+    def test_javascript_each_is_a_property(self):
+        self.assertTrue(self.shows("property", "queue.test.js", self.JS, "assert.throws"))
+
+    GO = (
+        "func TestReserveTable(t *testing.T) {\n"
+        "\tfor _, tc := range cases {\n"
+        "\t\tt.Run(tc.name, func(t *testing.T) { check(t, tc) })\n"
+        "\t}\n"
+        "}\n"
+        "\n"
+        "func TestReserveRace(t *testing.T) {\n"
+        "\tvar wg sync.WaitGroup\n"
+        "\tgo func() { defer wg.Done(); reserve(s) }()\n"
+        "}\n"
+        "\n"
+        "func TestReserveOnce(t *testing.T) {\n"
+        "\t// go func would race here\n"
+        "\tif err := reserve(s); err != nil { t.Fatal(err) }\n"
+        "}\n"
+    )
+
+    def test_a_java_method_name_is_not_a_marker(self):
+        text = (
+            "@Test\n"
+            "public void testThread() {\n"
+            "    assertEquals(1, reserve(unit));\n"
+            "}\n"
+        )
+        self.assertFalse(self.shows("concurrency", "ReserveTest.java", text, "@Test"))
+
+    def test_go_table_test_is_a_property(self):
+        self.assertTrue(self.shows("property", "reserve_test.go", self.GO, "func TestReserveTable"))
+
+    def test_go_goroutines_are_concurrency(self):
+        self.assertTrue(self.shows("concurrency", "reserve_test.go", self.GO, "func TestReserveRace"))
+
+    def test_go_comment_is_not_concurrency(self):
+        self.assertFalse(self.shows("concurrency", "reserve_test.go", self.GO, "func TestReserveOnce"))
+
+    def test_floor_division_is_not_a_python_comment(self):
+        text = "def test_halves(self):\n    for n in range(10): self.assertEqual(n // 2 * 2 + n % 2, n)\n"
+        self.assertTrue(self.shows("property", "test_x.py", text, "def test_halves"))
+
+
+class Documentation(unittest.TestCase):
+    """The contracts the model reads say what the validator enforces."""
+
+    def test_every_technique_marker_is_documented(self):
+        contracts = (REPO / "references" / "run-contracts.md").read_text(encoding="utf-8")
+        for technique, markers in checker.TECHNIQUE_MARKERS.items():
+            for marker in markers:
+                self.assertIn(f"`{marker}`", contracts, f"{technique} marker {marker!r} is not in run-contracts.md")
+
+    def test_skill_metadata_fits_the_format(self):
+        text = (REPO / "SKILL.md").read_text(encoding="utf-8")
+        _, front, body = text.split("---\n", 2)
+        self.assertIn("name: systemic\n", front)
+        description = " ".join(line.strip() for line in front.split("description: >-\n", 1)[1].splitlines())
+        # The Agent Skills format caps the description at 1024 characters.
+        self.assertLessEqual(len(description), 1024, len(description))
+        self.assertNotRegex(description, "[<>]")
+        # Past ~500 lines the body crowds the context; details live in references/.
+        self.assertLessEqual(len(text.splitlines()), 500)
+
+    def test_every_reference_the_skill_names_exists(self):
+        import re
+        text = (REPO / "SKILL.md").read_text(encoding="utf-8")
+        named = set(re.findall(r"`((?:references|scripts)/[\w./-]+)`", text))
+        self.assertTrue(named)
+        for rel in sorted(named):
+            self.assertTrue((REPO / rel).is_file(), f"SKILL.md names {rel}, which does not exist")
+        for path in (REPO / "references").glob("*.md"):
+            self.assertIn(f"references/{path.name}", text, f"SKILL.md never says when to read {path.name}")
+
+    def test_trigger_evals_cover_both_sides(self):
+        queries = json.loads((HERE / "trigger-evals.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(queries), 16)
+        for entry in queries:
+            self.assertEqual(set(entry), {"query", "should_trigger"})
+            self.assertIsInstance(entry["should_trigger"], bool)
+            self.assertGreater(len(entry["query"]), 40)
+        positives = sum(1 for entry in queries if entry["should_trigger"])
+        self.assertGreaterEqual(positives, 8)
+        self.assertGreaterEqual(len(queries) - positives, 8)
+
+    def test_evals_are_well_formed(self):
+        data = json.loads((HERE / "evals.json").read_text(encoding="utf-8"))
+        ids = [case["id"] for case in data["evals"]]
+        self.assertEqual(ids, list(range(1, len(ids) + 1)))
+        for case in data["evals"]:
+            self.assertIn(case.get("split", "dev"), {"dev", "holdout"})
+            for rel in case.get("files", []):
+                self.assertTrue((REPO / rel).exists(), f"eval {case['id']} names {rel}, which does not exist")
+        self.assertGreaterEqual(sum(1 for case in data["evals"] if case.get("split") == "holdout"), 2)
 
 
 if __name__ == "__main__":

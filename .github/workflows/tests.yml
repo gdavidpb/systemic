@@ -1,0 +1,44 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  # The validator is what a user's machine runs, and the README promises
+  # Python 3.9, so its tests run on the oldest and the newest version.
+  validator:
+    name: validator (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python3 -m unittest discover -s evals -p 'test_systemic_check.py' -v
+
+  # The fixtures are the code under audit. They use Python 3.10 syntax, and
+  # one of them is JavaScript, so their ground truth runs on a current
+  # Python with Node (without Node those tests would be skipped).
+  fixtures:
+    name: fixtures' ground truth
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: python3 -m unittest discover -s evals -p 'test_adversarial_fixtures.py' -v

@@ -3,7 +3,8 @@
 Operational guide for phase F3. Every check ends as one entry in
 `checks.json` with a verdict (`findings`, `clean` or `not_verifiable`), and
 every suspected defect as a candidate `C-n` with quoted evidence (see
-`references/run-contracts.md`). Candidates are hypotheses; F4 audits them. For each check: what to look for, how to detect
+`references/run-contracts.md`). Candidates are hypotheses; F4 audits them and
+groups them by root cause (`references/dedup.md`). For each check: what to look for, how to detect
 it in code or documents, and how to calibrate severity. Checks 1, 2, 10 and 11
 come directly from the GST framework; the rest are practical
 extensions of the same principle (system consistency) for real software with
@@ -45,7 +46,8 @@ medium if it is a latent trap.
 transition, an explicit prohibition (guard with a clear error), or — the
 finding — a **hole**: the operation proceeds without considering that state.
 **Detect**: build the matrix (it is written to `checks.json.matrices`, one
-cell per state × operator; every `hole` names its candidate or a note). Look for operators that mutate state without
+cell per state × operator; every `hole` names its candidate or a note). The
+columns are the operators that read or write the machine's fields. Look for operators that mutate state without
 checking the current state (missing guard). Contrast with declared rules ("a
 shipped order cannot be canceled") — a missing guard that contradicts a
 declared rule is an INCONSISTENCY, not just a hole.
@@ -137,8 +139,9 @@ Also trace mutable inputs or returned references: a caller retaining an item
 stored by reference may change the underlying values outside those guarded
 writers. Require a concrete accessible alias path and state its ownership
 and mutation condition; do not infer arbitrary external writes without one.
-**Severity**: high if both are used for decisions; medium if the derived one
-is presentation-only.
+**Severity**: high if anything decides on the value that drifts; medium if
+it is only displayed and can be recomputed from the source of truth, even
+when it already shows a wrong number (the rubric's medium says the same).
 
 ## 11. System limits
 

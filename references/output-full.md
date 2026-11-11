@@ -34,6 +34,8 @@ operator matrix from checks.json.>
 - **Check**: <which of the 12>
 - **Evidence**: <relative file:line or document section + a short quote>
 - **Systemic diagnosis**: <in GST vocabulary: which property is violated>
+- **Condition** (RISK) or **Question** (AMBIGUITY): <as recorded; omit the
+  line for an INCONSISTENCY>
 - **Impact and confidence**: <functional consequence; demonstrated effect,
   conditions and impact not verified; confidence high/medium/low with its basis>
 - **Recommendation**: <concrete action>
@@ -48,7 +50,8 @@ candidate + evidence that refuted it. Omit it when there are none.>
 
 ## Invariant coverage by tests
 <State whether the suite is in scope, absent or out of scope, and that it was
-read, not run. Then the category table; the header row is translated, the
+read, not run — or, when execution was allowed, which tests were run and
+what that confirmed. Then the category table; the header row is translated, the
 category names and the order are fixed:>
 | Category | Invariants | asserted | weak | contradicted | uncovered | not verifiable |
 |---|---|---|---|---|---|---|
@@ -76,5 +79,19 @@ enshrined, with the test that enshrines or detects it.>
 the fixed keyword from checks.json: findings (identify them), clean (what was
 verified), or not verifiable (missing material). Never blur clean and not
 verifiable. Then describe declared
-and implicit limits.>
+and implicit limits, the claims in `model.json.claims_unverified` with what
+is missing for each, and, when execution was allowed, what was executed and
+what was left as reasoned.>
 ```
+
+## Style
+
+- Diagnose with the framework's vocabulary (closure, operator, limit, minimal
+  expression) and connect the property to its functional impact.
+- Prioritize: a few well-evidenced findings beat 30 trivial ones. If there
+  are more than ~10, keep the minor ones brief: their heading plus one line
+  each for evidence and action.
+- Mermaid diagrams draw what is REAL (the built figure); when it differs from
+  what is declared, draw both or mark the differences — that divergence is
+  usually the most valuable finding.
+- Close with the most important missing component when supported.

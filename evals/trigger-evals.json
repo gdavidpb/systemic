@@ -1,0 +1,82 @@
+[
+  {
+    "query": "can you run a systemic analysis on src/billing/subscriptions? we keep getting subs that are 'active' and 'canceled_at' at the same time and nobody knows which operation leaves them like that",
+    "should_trigger": true
+  },
+  {
+    "query": "Our order lifecycle is draft -> pending_payment -> paid -> shipped -> delivered, with cancel and refund on the side. The code is in services/orders/ (models.py, operations.py, webhook.py). Is the state machine actually consistent with what the README says before we ship this?",
+    "should_trigger": true
+  },
+  {
+    "query": "revisa la consistencia de la máquina de estados de reservas en app/reservations/ — creo que hay transiciones que nadie maneja y estados a los que no se puede llegar",
+    "should_trigger": true
+  },
+  {
+    "query": "I wrote a design doc for the equipment rental flow (docs/rental-design.md), no code yet. Before the team starts building I'd like to know if the design contradicts itself anywhere: states, who can do what in each state, what happens on late returns",
+    "should_trigger": true
+  },
+  {
+    "query": "our test suite for the checkout saga is green (tests/test_checkout_saga.py, ~40 tests) but I don't trust it. do the tests really protect the invariants of the saga or do they just run the happy path?",
+    "should_trigger": true
+  },
+  {
+    "query": "We have a booking saga in booking/ with compensation steps (reserve seat, charge card, issue ticket) and a retry worker. Find the places where a partial failure or a retried step leaves a booking in a state the system can't represent.",
+    "should_trigger": true
+  },
+  {
+    "query": "apply systems thinking / TGS to the ticketing module (tickets/models.py, tickets/operations.py). I want the elements, operators and where the system is not closed",
+    "should_trigger": true
+  },
+  {
+    "query": "find contradictions between what docs/architecture.md promises about the invoice lifecycle and what invoices/operations.py and invoices/webhooks.py actually do. be strict, i want evidence with line numbers",
+    "should_trigger": true
+  },
+  {
+    "query": "the payment webhook handler in payments/hooks.ts and the refund job both write to payment.status. is this lifecycle safe under retries and when two of them run at once? audit the whole payment state machine, not just that one function",
+    "should_trigger": true
+  },
+  {
+    "query": "reaudita el módulo de órdenes: ya hay un reporte anterior en systemic-out/orders-module.md, quiero saber qué hallazgos siguen, cuáles se arreglaron y cuáles son nuevos",
+    "should_trigger": true
+  },
+  {
+    "query": "review this PR for me: https://github.com/acme/shop/pull/412 — mostly renames and a new endpoint for listing orders, check naming, error handling and whether it follows our style guide",
+    "should_trigger": false
+  },
+  {
+    "query": "test_refund_moves_the_order_to_refund_pending is failing on CI with AssertionError: 'refunded' != 'refund_pending' and I can't see why, here's the traceback, can you fix it",
+    "should_trigger": false
+  },
+  {
+    "query": "what's our line coverage for the orders package? run pytest with --cov on services/orders and tell me which files are under 80%",
+    "should_trigger": false
+  },
+  {
+    "query": "write a state machine for a traffic light in TypeScript with xstate, three states and a timer, plus a small test file",
+    "should_trigger": false
+  },
+  {
+    "query": "do a security review of the auth module (auth/session.py, auth/tokens.py): injection, token leakage, session fixation, that kind of thing",
+    "should_trigger": false
+  },
+  {
+    "query": "explain General Systems Theory to me — who was Bertalanffy, what's the difference with cybernetics, and give me a couple of examples outside software",
+    "should_trigger": false
+  },
+  {
+    "query": "our system design interview is tomorrow: design a URL shortener that handles 10k writes per second, walk me through the architecture and the trade-offs",
+    "should_trigger": false
+  },
+  {
+    "query": "refactor utils/text.py — slugify, truncate and strip_accents are a mess, split them up, add type hints and keep the behavior identical",
+    "should_trigger": false
+  },
+  {
+    "query": "add a 'paused' status to the Subscription enum in billing/models.py and a pause() method that sets it, plus a migration for the new value",
+    "should_trigger": false
+  },
+  {
+    "query": "the dashboard query in reports/monthly.sql takes 40 seconds on the orders table (12M rows). look at the query plan and tell me which indexes to add",
+    "should_trigger": false
+  }
+]
